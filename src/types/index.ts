@@ -316,7 +316,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     nome: 'Amigo',
     descricao: 'Primeira classe para iniciantes',
     ordem: 1,
-    cor: '#22C55E',
+    cor: '#3B82F6', // Azul
     classesPreRequisito: [],
     imagem: '/images/amigo-150x150.png',
   },
@@ -325,7 +325,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     nome: 'Companheiro',
     descricao: 'Segunda classe',
     ordem: 2,
-    cor: '#3B82F6',
+    cor: '#EF4444', // Vermelho
     classesPreRequisito: ['1'],
     imagem: '/images/companheiro-150x150.png',
   },
@@ -334,7 +334,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     nome: 'Pesquisador',
     descricao: 'Terceira classe',
     ordem: 3,
-    cor: '#8B5CF6',
+    cor: '#22C55E', // Verde
     classesPreRequisito: ['2'],
     imagem: '/images/pesquisador-150x150.png',
   },
@@ -343,7 +343,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     nome: 'Pioneiro',
     descricao: 'Quarta classe',
     ordem: 4,
-    cor: '#F59E0B',
+    cor: '#71717A', // Cinza
     classesPreRequisito: ['3'],
     imagem: '/images/pioneiro-150x150.png',
   },
@@ -352,7 +352,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     nome: 'Excursionista',
     descricao: 'Quinta classe',
     ordem: 5,
-    cor: '#EF4444',
+    cor: '#8B5CF6', // Roxo
     classesPreRequisito: ['4'],
     imagem: '/images/excursionista-150x150.png',
   },
@@ -361,7 +361,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     nome: 'Guia',
     descricao: 'Classe máxima',
     ordem: 6,
-    cor: '#C6A15B',
+    cor: '#EAB308', // Amarelo
     classesPreRequisito: ['5'],
     imagem: '/images/guia-150x150.png',
   },
