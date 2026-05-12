@@ -24,7 +24,17 @@ interface Area {
   requirements: Requirement[];
 }
 
-interface ClassMemberProgress {
+interface ClassProgress {
+  classId: string;
+  className: string;
+  classColor: string;
+  areas: Area[];
+  completedRequirements: number;
+  totalRequirements: number;
+  progressPercentage: number;
+}
+
+interface MemberProgress {
   memberId: string;
   memberName: string;
   memberUnidade: string;
@@ -37,10 +47,12 @@ interface ClassMemberProgress {
   progressPercentage: number;
 }
 
+type ProgressData = ClassProgress | MemberProgress;
+
 interface ClassRequirementsPopupProps {
   isOpen: boolean;
   onClose: () => void;
-  initialProgress: ClassMemberProgress | null;
+  initialProgress: ProgressData | null;
 }
 
 const areaIcons: Record<string, string> = {
@@ -71,6 +83,11 @@ export function ClassRequirementsPopup({
       setSelectedArea(null);
     }
   }, [initialProgress]);
+
+  // Check if it's a member progress or class progress
+  const isMemberProgress = (progress: ProgressData): progress is MemberProgress => {
+    return 'memberId' in progress;
+  };
 
   // Calculate progress
   const calculateProgress = (updatedAreas: Area[]) => {
@@ -116,7 +133,6 @@ export function ClassRequirementsPopup({
     setProgressPercentage(percentage);
     setCompletedCount(completed);
 
-    // Find the requirement that was toggled
     const req = updatedAreas
       .find((a) => a.id === areaId)
       ?.requirements.find((r) => r.id === reqId);
@@ -162,47 +178,71 @@ export function ClassRequirementsPopup({
 
   const totalReqs = areas.reduce((acc, area) => acc + area.requirements.length, 0);
   const currentArea = areas.find((a) => a.id === selectedArea);
+  const showMemberInfo = isMemberProgress(initialProgress);
 
   return (
     <AppModal
       isOpen={isOpen}
       onClose={onClose}
       title={initialProgress.className}
-      description={`Progresso de ${initialProgress.memberName}`}
+      description={showMemberInfo ? `Progresso de ${(initialProgress as MemberProgress).memberName}` : 'Requisitos da Classe'}
       size="lg"
     >
       <div className="space-y-5">
-        {/* Member Info Header */}
-        <div className="flex items-center gap-4 p-3 bg-card rounded-xl">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{
-              background: `linear-gradient(135deg, ${initialProgress.classColor}40, ${initialProgress.classColor}20)`,
-            }}
-          >
-            <span className="text-xl">👤</span>
+        {/* Header - Member or Class Info */}
+        {showMemberInfo ? (
+          <div className="flex items-center gap-4 p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)' }}>
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{
+                background: `linear-gradient(135deg, ${initialProgress.classColor}40, ${initialProgress.classColor}20)`,
+              }}
+            >
+              <span className="text-xl">👤</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium" style={{ color: 'var(--text-color)' }}>{(initialProgress as MemberProgress).memberName}</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>{(initialProgress as MemberProgress).memberUnidade}</p>
+            </div>
+            <AppBadge
+              variant={progressPercentage === 100 ? 'success' : 'primary'}
+              size="sm"
+            >
+              {progressPercentage}%
+            </AppBadge>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-text-primary">{initialProgress.memberName}</p>
-            <p className="text-sm text-muted">{initialProgress.memberUnidade}</p>
+        ) : (
+          <div className="flex items-center gap-4 p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)' }}>
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{
+                background: `linear-gradient(135deg, ${initialProgress.classColor}40, ${initialProgress.classColor}20)`,
+              }}
+            >
+              <BookIcon className="w-6 h-6" style={{ color: initialProgress.classColor }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium" style={{ color: 'var(--text-color)' }}>{initialProgress.className}</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Classe {initialProgress.classId} de 6</p>
+            </div>
+            <AppBadge
+              variant={progressPercentage === 100 ? 'success' : 'primary'}
+              size="sm"
+            >
+              {progressPercentage}%
+            </AppBadge>
           </div>
-          <AppBadge
-            variant={progressPercentage === 100 ? 'success' : 'primary'}
-            size="sm"
-          >
-            {progressPercentage}%
-          </AppBadge>
-        </div>
+        )}
 
         {/* Overall Progress Bar */}
         <div>
           <div className="flex justify-between mb-2">
-            <span className="text-sm text-muted">Progresso geral</span>
+            <span className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Progresso geral</span>
             <span className="text-sm font-medium text-primary">
               {completedCount}/{totalReqs}
             </span>
           </div>
-          <div className="h-3 bg-surface rounded-full overflow-hidden">
+          <div className="h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progressPercentage}%` }}
@@ -216,18 +256,19 @@ export function ClassRequirementsPopup({
         {/* Areas Horizontal Scroll */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-medium text-text-secondary">Áreas de Atuação</h4>
+            <h4 className="text-sm font-medium" style={{ color: 'var(--text-secondary-color)' }}>Áreas de Atuação</h4>
             {progressPercentage > 0 && (
               <button
                 onClick={resetAll}
-                className="flex items-center gap-1 text-xs text-muted hover:text-danger transition-colors"
+                className="flex items-center gap-1 text-xs hover:text-danger transition-colors"
+                style={{ color: 'var(--text-secondary-color)' }}
               >
                 <RotateCcw className="w-3 h-3" />
                 Resetar
               </button>
             )}
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'none' }}>
             {areas.map((area) => {
               const areaCompleted = area.requirements.filter((r) => r.completed).length;
               const areaTotal = area.requirements.length;
@@ -244,16 +285,17 @@ export function ClassRequirementsPopup({
                     'flex-shrink-0 w-32 p-3 rounded-xl border transition-all text-left',
                     isSelected
                       ? 'border-primary bg-primary/10'
-                      : 'border-border bg-card hover:border-primary/50',
+                      : 'border-border',
                     isComplete && 'border-success/50 bg-success/5'
                   )}
+                  style={{ backgroundColor: isSelected ? undefined : 'var(--card-color)' }}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-xl">{areaIcons[area.icon] || '📋'}</span>
                   </div>
-                  <p className="text-sm font-medium text-text-primary truncate">{area.name}</p>
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text-color)' }}>{area.name}</p>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-xs text-muted">
+                    <span className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>
                       {areaCompleted}/{areaTotal}
                     </span>
                     <span
@@ -263,7 +305,7 @@ export function ClassRequirementsPopup({
                       {areaPercentage}%
                     </span>
                   </div>
-                  <div className="h-1.5 bg-surface rounded-full mt-2 overflow-hidden">
+                  <div className="h-1.5 rounded-full mt-2 overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${areaPercentage}%` }}
@@ -291,7 +333,7 @@ export function ClassRequirementsPopup({
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{areaIcons[currentArea.icon] || '📋'}</span>
-                  <h4 className="text-sm font-medium text-text-primary">
+                  <h4 className="text-sm font-medium" style={{ color: 'var(--text-color)' }}>
                     {currentArea.name}
                   </h4>
                 </div>
@@ -312,8 +354,9 @@ export function ClassRequirementsPopup({
                       'w-full p-3 rounded-xl border transition-all text-left',
                       req.completed
                         ? 'bg-success/10 border-success/30'
-                        : 'bg-card border-border hover:border-primary/30'
+                        : 'border-border'
                     )}
+                    style={{ backgroundColor: req.completed ? undefined : 'var(--card-color)' }}
                   >
                     <div className="flex items-start gap-3">
                       <div
@@ -321,25 +364,27 @@ export function ClassRequirementsPopup({
                           'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all cursor-pointer',
                           req.completed
                             ? 'bg-success'
-                            : 'bg-surface border border-border hover:border-primary/50'
+                            : 'border'
                         )}
+                        style={req.completed ? undefined : { borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-color)' }}
                       >
                         {req.completed ? (
                           <Check className="w-4 h-4 text-white" />
                         ) : (
-                          <span className="text-xs text-muted">{index + 1}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>{index + 1}</span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p
                           className={cn(
                             'text-sm font-medium',
-                            req.completed ? 'text-success' : 'text-text-primary'
+                            req.completed ? 'text-success' : ''
                           )}
+                          style={req.completed ? undefined : { color: 'var(--text-color)' }}
                         >
                           {req.name}
                         </p>
-                        <p className="text-xs text-muted mt-0.5">{req.description}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary-color)' }}>{req.description}</p>
                         {req.completed && req.completedAt && (
                           <p className="text-xs text-success mt-1">
                             ✓ Concluído em {new Date(req.completedAt).toLocaleDateString('pt-BR')}
@@ -356,12 +401,21 @@ export function ClassRequirementsPopup({
 
         {!selectedArea && (
           <div className="flex items-center justify-center py-4">
-            <p className="text-sm text-muted text-center">
+            <p className="text-sm text-center" style={{ color: 'var(--text-secondary-color)' }}>
               👆 Selecione uma área acima para ver seus requisitos
             </p>
           </div>
         )}
       </div>
     </AppModal>
+  );
+}
+
+// Simple Book icon component
+function BookIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
   );
 }

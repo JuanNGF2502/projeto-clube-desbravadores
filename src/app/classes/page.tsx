@@ -63,6 +63,16 @@ interface MemberClass {
   memberProgress: MemberClassProgress[];
 }
 
+interface ClassProgress {
+  classId: string;
+  className: string;
+  classColor: string;
+  areas: Area[];
+  completedRequirements: number;
+  totalRequirements: number;
+  progressPercentage: number;
+}
+
 // Requirements by area for each class
 const classAreasData: Record<string, Area[]> = {
   '1': [
@@ -316,13 +326,26 @@ export default function ClassesPage() {
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
   const [selectedMemberProgress, setSelectedMemberProgress] = useState<MemberClassProgress | null>(null);
   const [isRequirementsModalOpen, setIsRequirementsModalOpen] = useState(false);
+  const [selectedClassProgress, setSelectedClassProgress] = useState<ClassProgress | null>(null);
   const { addToast } = useToast();
 
   const totalCompletions = classes.reduce((acc, c) => acc + c.completedBy, 0);
 
   const handleClassClick = (classe: MemberClass) => {
-    setSelectedClass(classe);
-    setIsModalOpen(true);
+    // Create class progress data for the popup
+    const classProgress: ClassProgress = {
+      classId: classe.id,
+      className: classe.nome,
+      classColor: classe.cor,
+      areas: classAreasData[classe.id] || [],
+      completedRequirements: 0,
+      totalRequirements: (classAreasData[classe.id] || []).reduce(
+        (acc, area) => acc + area.requirements.length, 0
+      ),
+      progressPercentage: 0,
+    };
+    setSelectedClassProgress(classProgress);
+    setIsRequirementsModalOpen(true);
   };
 
   const handleShowMembers = (classe: MemberClass, e: React.MouseEvent) => {
@@ -333,6 +356,7 @@ export default function ClassesPage() {
 
   const handleMemberClick = (memberProgress: MemberClassProgress) => {
     setSelectedMemberProgress(memberProgress);
+    setSelectedClassProgress(null);
     setIsRequirementsModalOpen(true);
   };
 
@@ -575,11 +599,11 @@ export default function ClassesPage() {
         )}
       </AppModal>
 
-      {/* Member Requirements Popup */}
+      {/* Member/Class Requirements Popup */}
       <ClassRequirementsPopup
         isOpen={isRequirementsModalOpen}
         onClose={() => setIsRequirementsModalOpen(false)}
-        initialProgress={selectedMemberProgress}
+        initialProgress={selectedClassProgress || selectedMemberProgress}
       />
     </AppLayout>
   );

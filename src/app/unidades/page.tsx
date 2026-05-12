@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Plus, Users, Search, MoreVertical, Pencil, Trash2, Image, Mic, Info, History } from 'lucide-react';
+import { Users, Search, Image, Mic } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -12,7 +12,6 @@ import { AppTextarea } from '@/components/ui/AppInput';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppEmptyState } from '@/components/ui/AppEmptyState';
-import { AppSelect } from '@/components/ui/AppSelect';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { useToast } from '@/components/ui/Toast';
 import { Unit, UNIT_GENDERS, DEFAULT_UNIT_COLORS } from '@/types';
@@ -57,6 +56,12 @@ interface FormData {
   historiaNome: string;
 }
 
+// Mock scores for units
+const unitScores: Record<string, number> = {
+  '1': 850,
+  '2': 720,
+};
+
 export default function UnitsPage() {
   const [units, setUnits] = useState<Unit[]>(initialUnits);
   const [search, setSearch] = useState('');
@@ -71,7 +76,6 @@ export default function UnitsPage() {
     significadoLogo: '',
     historiaNome: '',
   });
-  const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const { addToast } = useToast();
   const router = useRouter();
 
@@ -156,31 +160,10 @@ export default function UnitsPage() {
       historiaNome: unit.historiaNome || '',
     });
     setIsModalOpen(true);
-    setMenuOpen(null);
-  };
-
-  const handleDelete = (unit: Unit) => {
-    setUnits(units.filter((u) => u.id !== unit.id));
-    addToast({ type: 'success', title: 'Unidade removida', message: `${unit.nome} foi removida` });
-    setMenuOpen(null);
-  };
-
-  const openCreateModal = () => {
-    setEditingUnit(null);
-    resetForm();
-    setIsModalOpen(true);
   };
 
   return (
-    <AppLayout
-      title="Unidades"
-      subtitle={`${units.length} unidades cadastradas`}
-      actions={
-        <AppButton size="sm" onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
-          Nova
-        </AppButton>
-      }
-    >
+    <AppLayout title="Unidades" subtitle={`${units.length} unidades cadastradas`}>
       <AppInput
         placeholder="Buscar unidade..."
         value={search}
@@ -193,8 +176,7 @@ export default function UnitsPage() {
         <AppEmptyState
           icon={<Users className="w-8 h-8 text-primary" />}
           title="Nenhuma unidade encontrada"
-          description="Clique abaixo para criar sua primeira unidade"
-          action={{ label: 'Criar Unidade', onClick: openCreateModal }}
+          description="Gerencie suas unidades pelo perfil"
         />
       ) : (
         <div className="grid gap-3">
@@ -234,7 +216,7 @@ export default function UnitsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-text-primary">{unit.nome}</h3>
+                        <h3 className="font-semibold" style={{ color: 'var(--text-color)' }}>{unit.nome}</h3>
                         <AppBadge
                           variant={unit.genero === 'M' ? 'info' : unit.genero === 'F' ? 'danger' : 'success'}
                           size="sm"
@@ -242,49 +224,18 @@ export default function UnitsPage() {
                           {unit.genero === 'M' ? 'Masculina' : unit.genero === 'F' ? 'Feminina' : 'Mista'}
                         </AppBadge>
                       </div>
-                      <p className="text-sm text-muted">{unit.membrosCount} membros</p>
+                      <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>
+                        {unit.membrosCount} membros
+                      </p>
                     </div>
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMenuOpen(menuOpen === unit.id ? null : unit.id);
-                        }}
-                        className="p-2 rounded-xl hover:bg-card transition-colors"
-                      >
-                        <MoreVertical className="w-5 h-5 text-muted" />
-                      </button>
-                      <AnimatePresence>
-                        {menuOpen === unit.id && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="absolute right-0 top-full mt-2 w-40 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-10"
-                          >
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEdit(unit);
-                              }}
-                              className="w-full px-4 py-3 text-left text-sm text-text-primary hover:bg-primary/10 flex items-center gap-2"
-                            >
-                              <Pencil className="w-4 h-4" />
-                              Editar
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(unit);
-                              }}
-                              className="w-full px-4 py-3 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Excluir
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-primary">{unitScores[unit.id] || 0}</p>
+                        <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>pontos</p>
+                      </div>
+                      <svg className="w-5 h-5" style={{ color: 'var(--text-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
                   </div>
                 </AppCard>
@@ -294,7 +245,7 @@ export default function UnitsPage() {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Modal - triggered from profile */}
       <AppModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -316,7 +267,7 @@ export default function UnitsPage() {
 
           {/* Gênero */}
           <div>
-            <label className="text-sm font-medium text-text-secondary ml-1 block mb-2">Gênero</label>
+            <label className="text-sm font-medium ml-1 block mb-2" style={{ color: 'var(--text-secondary-color)' }}>Gênero</label>
             <div className="flex gap-2">
               {UNIT_GENDERS.map((g) => (
                 <button
@@ -327,8 +278,13 @@ export default function UnitsPage() {
                     'flex-1 py-2.5 rounded-xl text-sm font-medium transition-all',
                     formData.genero === g.value
                       ? 'bg-primary text-background'
-                      : 'bg-card border border-border text-text-secondary hover:border-primary/50'
+                      : 'border transition-colors'
                   )}
+                  style={{
+                    backgroundColor: formData.genero === g.value ? undefined : 'var(--card-color)',
+                    borderColor: formData.genero === g.value ? undefined : 'var(--border-color)',
+                    color: formData.genero === g.value ? undefined : 'var(--text-secondary-color)',
+                  }}
                 >
                   {g.label}
                 </button>
@@ -338,7 +294,7 @@ export default function UnitsPage() {
 
           {/* Color Picker */}
           <div>
-            <label className="text-sm font-medium text-text-secondary ml-1 block mb-2">
+            <label className="text-sm font-medium ml-1 block mb-2" style={{ color: 'var(--text-secondary-color)' }}>
               Cores da Unidade
             </label>
             <ColorPicker
@@ -359,11 +315,12 @@ export default function UnitsPage() {
 
           {/* Logo da Unidade */}
           <div>
-            <label className="text-sm font-medium text-text-secondary ml-1 block mb-2">
+            <label className="text-sm font-medium ml-1 block mb-2" style={{ color: 'var(--text-secondary-color)' }}>
               Logo da Unidade
             </label>
             <div
-              className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
+              className="border-2 border-dashed rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
+              style={{ borderColor: 'var(--border-color)' }}
               onClick={() => addToast({ type: 'info', title: 'Em breve', message: 'Upload de imagem será implementado' })}
             >
               {formData.cores.length > 0 ? (
@@ -378,12 +335,12 @@ export default function UnitsPage() {
                   >
                     <Image className="w-8 h-8 text-white/50" />
                   </div>
-                  <p className="text-sm text-muted mt-2">Clique para adicionar logo</p>
+                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary-color)' }}>Clique para adicionar logo</p>
                 </div>
               ) : (
                 <>
-                  <Image className="w-8 h-8 text-muted mx-auto mb-2" />
-                  <p className="text-sm text-text-secondary">Selecione as cores primeiro</p>
+                  <Image className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-secondary-color)' }} />
+                  <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Selecione as cores primeiro</p>
                 </>
               )}
             </div>

@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Calendar, User, Home, Image, Info, Mic } from 'lucide-react';
+import { Users, Calendar, User, Home, Image, Info, Mic, Trophy } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { UnitHeader, TabsNavigation, ScoreCard } from '@/components/unidades';
+import { UnitHeader, TabsNavigation, ScoreCard, RankingModal } from '@/components/unidades';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppStatsCard } from '@/components/ui/AppStatsCard';
+import { AppButton } from '@/components/ui/AppButton';
 import { cn } from '@/utils/cn';
 
 interface Tab {
@@ -54,6 +55,7 @@ const mockUnit = {
 
 export default function UnitDetailPage() {
   const [activeTab, setActiveTab] = useState('resumo');
+  const [showRanking, setShowRanking] = useState(false);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -239,12 +241,31 @@ export default function UnitDetailPage() {
           gritoDeGuerra={mockUnit.gritoDeGuerra}
         />
 
+        {/* Ranking Button */}
+        <AppButton
+          variant="primary"
+          className="w-full"
+          onClick={() => setShowRanking(true)}
+        >
+          <Trophy className="w-5 h-5 mr-2" />
+          Ranking da Unidade
+        </AppButton>
+
         <TabsNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
         <AnimatePresence mode="wait">
           {renderContent()}
         </AnimatePresence>
       </div>
+
+      <RankingModal
+        isOpen={showRanking}
+        onClose={() => setShowRanking(false)}
+        unidadeId={mockUnit.id}
+        unidadeNome={mockUnit.nome}
+        unidadeCores={mockUnit.cores}
+        membros={members}
+      />
     </AppLayout>
   );
 }

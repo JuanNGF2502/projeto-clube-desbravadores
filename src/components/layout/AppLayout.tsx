@@ -37,8 +37,8 @@ export function AppLayout({
 
   const navItems: NavItem[] = [
     { label: 'Início', icon: Home, href: '/dashboard' },
-    { label: 'Unidades', icon: Users, href: '/unidades' },
     { label: 'Classes', icon: BookOpen, href: '/classes' },
+    { label: 'Unidades', icon: Users, href: '/unidades' },
     { label: 'Perfil', icon: User, href: '/profile' },
   ];
 

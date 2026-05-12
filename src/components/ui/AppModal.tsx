@@ -16,6 +16,7 @@ interface AppModalProps {
   showCloseButton?: boolean;
   closeOnOverlayClick?: boolean;
   className?: string;
+  scrollable?: boolean;
 }
 
 export function AppModal({
@@ -28,6 +29,7 @@ export function AppModal({
   showCloseButton = true,
   closeOnOverlayClick = true,
   className,
+  scrollable = false,
 }: AppModalProps) {
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -100,7 +102,7 @@ export function AppModal({
                 )}
               </div>
             )}
-            <div className="p-6">{children}</div>
+            <div className={scrollable ? 'p-6 max-h-[calc(90vh-80px)] overflow-y-auto' : 'p-6'}>{children}</div>
           </motion.div>
         </div>
       )}

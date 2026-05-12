@@ -13,6 +13,7 @@ interface AppBadgeProps {
   className?: string;
   dot?: boolean;
   onClick?: MouseEventHandler<HTMLSpanElement>;
+  color?: string;
 }
 
 export function AppBadge({
@@ -22,6 +23,7 @@ export function AppBadge({
   className,
   dot = false,
   onClick,
+  color,
 }: AppBadgeProps) {
   const variants = {
     primary: 'bg-primary/20 text-primary border-primary/30',
@@ -32,6 +34,12 @@ export function AppBadge({
     info: 'bg-info/20 text-info border-info/30',
     ghost: 'bg-transparent text-muted border-transparent',
   };
+
+  const customColor = color ? {
+    backgroundColor: `${color}20`,
+    color: color,
+    borderColor: `${color}30`,
+  } : {};
 
   const sizes = {
     sm: 'px-2 py-0.5 text-xs gap-1',
@@ -45,10 +53,11 @@ export function AppBadge({
         'inline-flex items-center font-medium rounded-full border',
         'transition-colors duration-200',
         onClick && 'cursor-pointer hover:opacity-80',
-        variants[variant],
+        !color && variants[variant],
         sizes[size],
         className
       )}
+      style={color ? customColor : undefined}
       onClick={onClick}
     >
       {dot && (
