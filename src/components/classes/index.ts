@@ -1,0 +1,1 @@
+export { ClassRequirementsPopup } from './ClassRequirementsPopup';
