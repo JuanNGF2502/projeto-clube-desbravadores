@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Remove-Item *)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git config *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(gh repo *)",
+      "Bash(git ls-remote *)",
+      "Bash(npm install *)",
+      "Bash(Get-ChildItem \"public/icons\" -File)",
+      "Bash(Select-Object Name, Length)"
+    ]
+  }
+}

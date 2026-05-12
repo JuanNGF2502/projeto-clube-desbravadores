@@ -2,16 +2,16 @@
 
 import { ReactNode } from 'react';
 import { LucideIcon } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
 import { motion } from 'framer-motion';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
-import { Home, Users, BookOpen, Star, User } from 'lucide-react';
+import { Home, Users, BookOpen, User } from 'lucide-react';
 
 interface NavItem {
   label: string;
   icon: LucideIcon;
   href: string;
-  active?: boolean;
 }
 
 interface AppLayoutProps {
@@ -33,13 +33,19 @@ export function AppLayout({
   backHref,
   className,
 }: AppLayoutProps) {
+  const pathname = usePathname();
+
   const navItems: NavItem[] = [
-    { label: 'Início', icon: Home, href: '/dashboard', active: false },
-    { label: 'Unidades', icon: Users, href: '/unidades', active: false },
-    { label: 'Classes', icon: BookOpen, href: '/classes', active: false },
-    { label: 'Especiais', icon: Star, href: '/especialidades', active: false },
-    { label: 'Perfil', icon: User, href: '/profile', active: false },
+    { label: 'Início', icon: Home, href: '/dashboard' },
+    { label: 'Unidades', icon: Users, href: '/unidades' },
+    { label: 'Classes', icon: BookOpen, href: '/classes' },
+    { label: 'Perfil', icon: User, href: '/profile' },
   ];
+
+  const isActive = (href: string) => {
+    if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/';
+    return pathname.startsWith(href);
+  };
 
   return (
     <div className="min-h-screen w-full max-w-md mx-auto relative flex flex-col bg-background">

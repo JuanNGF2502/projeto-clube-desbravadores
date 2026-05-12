@@ -87,11 +87,7 @@ export default function RootLayout({
       <body
         className={`bg-background text-foreground ${inter.className}`}
         style={{
-          // iOS safe area
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          paddingLeft: 'env(safe-area-inset-left)',
-          paddingRight: 'env(safe-area-inset-right)',
+          // iOS safe area - apply via CSS utility class instead
         }}
       >
         <AppProvider>

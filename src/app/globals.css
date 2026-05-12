@@ -125,3 +125,16 @@ body {
   background: rgba(198, 161, 91, 0.3);
   color: #FAFAFA;
 }
+
+/* Safe area for iOS */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

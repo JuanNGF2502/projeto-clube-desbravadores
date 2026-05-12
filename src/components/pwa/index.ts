@@ -1,2 +1,2 @@
-export { PWABanner, ConnectionIndicator, PWASplash } from './PWABanner';
+export { PWABanner } from './PWABanner';
 export { InstallPWAButton, PWAStatus } from './InstallPWAButton';
