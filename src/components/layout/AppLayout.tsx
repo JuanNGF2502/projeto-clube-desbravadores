@@ -48,14 +48,21 @@ export function AppLayout({
   };
 
   return (
-    <div className="min-h-screen w-full max-w-md mx-auto relative flex flex-col bg-background">
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border/50">
+    <div className="min-h-screen w-full max-w-md mx-auto relative flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
+      <header
+        className="sticky top-0 z-40 backdrop-blur-md"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--bg) 90%, transparent)',
+          borderBottom: '1px solid var(--border-color)',
+        }}
+      >
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             {backHref && (
               <a
                 href={backHref}
-                className="p-2 rounded-xl bg-card border border-border text-text-primary hover:bg-primary/10 transition-colors"
+                className="p-2 rounded-xl transition-colors"
+                style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)', color: 'var(--text-color)' }}
               >
                 <svg
                   className="w-5 h-5"
@@ -74,10 +81,10 @@ export function AppLayout({
             )}
             <div>
               {title && (
-                <h1 className="text-lg font-bold text-text-primary">{title}</h1>
+                <h1 className="text-lg font-bold" style={{ color: 'var(--text-color)' }}>{title}</h1>
               )}
               {subtitle && (
-                <p className="text-xs text-muted">{subtitle}</p>
+                <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>{subtitle}</p>
               )}
             </div>
           </div>

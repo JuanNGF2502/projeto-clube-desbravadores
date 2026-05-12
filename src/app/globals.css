@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #09090B;
-  --color-surface: #111113;
-  --color-card: #18181B;
-  --color-border: #27272A;
+  /* Colors - these will be overridden by the data-theme attribute */
+  --color-background: var(--bg);
+  --color-surface: var(--surface-color);
+  --color-card: var(--card-color);
+  --color-border: var(--border-color);
 
   --color-primary: #C6A15B;
   --color-primary-light: #E8C98B;
   --color-primary-dark: #9A7A3D;
 
-  --color-text-primary: #FAFAFA;
-  --color-text-secondary: #A1A1AA;
-  --color-muted: #A1A1AA;
+  --color-text-primary: var(--text-color);
+  --color-text-secondary: var(--text-secondary-color);
+  --color-muted: var(--text-secondary-color);
 
   --color-success: #22C55E;
   --color-danger: #EF4444;
@@ -50,18 +51,46 @@
   }
 }
 
-:root {
-  --background: #09090B;
-  --foreground: #FAFAFA;
+/* Dark theme (default) */
+:root,
+[data-theme="dark"] {
+  --bg: #09090B;
+  --text-color: #FAFAFA;
+  --text-secondary-color: #A1A1AA;
+  --surface-color: #111113;
+  --card-color: #18181B;
+  --border-color: #27272A;
+  --glass-bg: rgba(24, 24, 27, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --scrollbar: rgba(198, 161, 91, 0.3);
+  --scrollbar-hover: rgba(198, 161, 91, 0.5);
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg: #FAFAFA;
+  --text-color: #09090B;
+  --text-secondary-color: #71717A;
+  --surface-color: #F4F4F5;
+  --card-color: #FFFFFF;
+  --border-color: #E4E4E7;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --scrollbar: rgba(0, 0, 0, 0.2);
+  --scrollbar-hover: rgba(0, 0, 0, 0.35);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background-color: var(--bg);
+}
+
 body {
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--bg);
+  color: var(--text-color);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
@@ -69,10 +98,10 @@ body {
 
 /* Glass Effect */
 .glass-effect {
-  background: rgba(24, 24, 27, 0.8);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
 }
 
 /* Gold Glow Effect */
@@ -96,11 +125,6 @@ body {
   background-clip: text;
 }
 
-/* Dark Gradient */
-.dark-gradient {
-  background: linear-gradient(135deg, #09090B 0%, #18181B 100%);
-}
-
 /* Scrollbar Custom */
 ::-webkit-scrollbar {
   width: 6px;
@@ -112,18 +136,18 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(198, 161, 91, 0.3);
+  background: var(--scrollbar);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(198, 161, 91, 0.5);
+  background: var(--scrollbar-hover);
 }
 
 /* Selection */
 ::selection {
   background: rgba(198, 161, 91, 0.3);
-  color: #FAFAFA;
+  color: var(--text-color);
 }
 
 /* Safe area for iOS */

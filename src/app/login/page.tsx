@@ -69,7 +69,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full max-w-md mx-auto relative flex flex-col bg-background">
+    <div className="min-h-screen w-full max-w-md mx-auto relative flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl" />
@@ -117,7 +117,8 @@ export default function LoginPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="text-muted text-sm"
+            className="text-sm"
+            style={{ color: 'var(--text-secondary-color)' }}
           >
             Sistema de Gestão Premium
           </motion.p>
@@ -183,7 +184,8 @@ export default function LoginPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
-          className="text-center text-xs text-muted mt-8"
+          className="text-center text-xs mt-8"
+          style={{ color: 'var(--text-secondary-color)' }}
         >
           © 2024 Sistema de Desbravadores
         </motion.p>

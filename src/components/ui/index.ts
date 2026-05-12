@@ -12,3 +12,4 @@ export { AppSkeleton, CardSkeleton, TableSkeleton } from './AppSkeleton';
 export { AppTable } from './AppTable';
 export { ToastProvider, useToast } from './Toast';
 export { ColorPicker } from './ColorPicker';
+export { ThemeToggle } from './ThemeToggle';

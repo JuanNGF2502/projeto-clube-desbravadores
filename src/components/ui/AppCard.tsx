@@ -38,12 +38,14 @@ export function AppCard({
   return (
     <Component
       className={cn(
-        'bg-card border border-border rounded-2xl',
-        'shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
-        hover && 'cursor-pointer transition-all duration-200 hover:border-primary/30 hover:gold-glow-hover',
+        'rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
         paddings[padding],
         className
       )}
+      style={{
+        backgroundColor: 'var(--card-color)',
+        border: '1px solid var(--border-color)',
+      }}
       onClick={onClick}
       {...motionProps}
     >
@@ -84,11 +86,17 @@ export function GlassCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        'glass-effect rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
+        'rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
         blurs[blur],
         paddings[padding],
         className
       )}
+      style={{
+        background: 'var(--glass-bg)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid var(--glass-border)',
+      }}
     >
       {children}
     </motion.div>

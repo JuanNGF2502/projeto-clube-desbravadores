@@ -47,7 +47,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#09090B',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FAFAFA' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090B' },
+  ],
 };
 
 interface Props {
@@ -57,12 +60,25 @@ interface Props {
 export default function RootLayout({
   children,
 }: Props) {
+  // Script to prevent flash of wrong theme
+  const themeScript = `
+    (function() {
+      const stored = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = stored || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  `;
+
   return (
     <html
       lang="pt-br"
       suppressHydrationWarning
     >
       <head>
+        {/* Theme script - runs before page renders to prevent flash */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+
         {/* iPhone Safe Area */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -71,7 +87,8 @@ export default function RootLayout({
         {/* Android */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="application-name" content="Desbravadores" />
-        <meta name="theme-color" content="#09090B" />
+        <meta name="theme-color" content="#09090B" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#FAFAFA" media="(prefers-color-scheme: light)" />
 
         {/* Windows */}
         <meta name="msapplication-TileColor" content="#09090B" />
@@ -82,14 +99,8 @@ export default function RootLayout({
 
         {/* iPad/iPhone */}
         <link rel="apple-touch-icon" href="/icons/icon-source.svg" />
-
       </head>
-      <body
-        className={`bg-background text-foreground ${inter.className}`}
-        style={{
-          // iOS safe area - apply via CSS utility class instead
-        }}
-      >
+      <body className={inter.className}>
         <AppProvider>
           <PWABanner />
           {children}
