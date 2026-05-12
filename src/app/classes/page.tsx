@@ -523,14 +523,14 @@ export default function ClassesPage() {
         {selectedClass && (
           <div className="space-y-4">
             <div
-              className="h-24 rounded-xl flex items-center justify-center overflow-hidden"
-              style={{ backgroundColor: `${selectedClass.cor}20` }}
+              className="h-32 rounded-xl flex items-center justify-center overflow-hidden"
+              style={{ backgroundColor: `${selectedClass.cor}15` }}
             >
               {selectedClass.imagem ? (
                 <img
                   src={selectedClass.imagem}
                   alt={selectedClass.nome}
-                  className="w-full h-full object-contain"
+                  className="w-28 h-28 object-contain drop-shadow-md"
                 />
               ) : (
                 <BookOpen className="w-12 h-12" style={{ color: selectedClass.cor }} />

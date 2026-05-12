@@ -1,6 +1,6 @@
 'use client';
 
-import { User, Calendar, Phone, Mail, Shield, BookOpen, Users, Star, Clock, Award } from 'lucide-react';
+import { User, Calendar, Phone, Mail, Shield, Users, Star, Clock, Award } from 'lucide-react';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
@@ -178,7 +178,6 @@ export function MembroDetailModal({
         {/* Classes */}
         <AppCard padding="sm">
           <h3 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-primary" />
             Classes
           </h3>
           <div className="space-y-2">
@@ -192,9 +191,13 @@ export function MembroDetailModal({
                       className="flex items-center gap-2 px-3 py-2 rounded-xl"
                       style={{ backgroundColor: `${classe.cor}20` }}
                     >
-                      <span className="text-lg font-bold" style={{ color: classe.cor }}>
-                        {classe.ordem}
-                      </span>
+                      {classe.imagem && (
+                        <img
+                          src={classe.imagem}
+                          alt={classe.nome}
+                          className="w-8 h-8 rounded-lg object-cover"
+                        />
+                      )}
                       <span className="font-medium text-text-primary">{classe.nome}</span>
                     </div>
                   ))}
@@ -211,9 +214,22 @@ export function MembroDetailModal({
                     .map((classe, idx) => {
                       const info = getClasseById(classe.classeId);
                       return info ? (
-                        <AppBadge key={idx} variant="success" size="sm">
-                          {info.nome}
-                        </AppBadge>
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 px-2 py-1 rounded-lg"
+                          style={{ backgroundColor: `${info.cor}20` }}
+                        >
+                          {info.imagem && (
+                            <img
+                              src={info.imagem}
+                              alt={info.nome}
+                              className="w-6 h-6 rounded-md object-cover"
+                            />
+                          )}
+                          <span className="text-sm font-medium" style={{ color: info.cor }}>
+                            {info.nome}
+                          </span>
+                        </div>
                       ) : null;
                     })}
                 </div>

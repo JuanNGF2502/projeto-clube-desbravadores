@@ -8,6 +8,7 @@ import { AppBadge } from '@/components/ui/AppBadge';
 import { AppButton } from '@/components/ui/AppButton';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/utils/cn';
+import { DEFAULT_CLASSES } from '@/types';
 
 interface Requirement {
   id: string;
@@ -214,12 +215,23 @@ export function ClassRequirementsPopup({
         ) : (
           <div className="flex items-center gap-4 p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)' }}>
             <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              className="w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden"
               style={{
                 background: `linear-gradient(135deg, ${initialProgress.classColor}40, ${initialProgress.classColor}20)`,
               }}
             >
-              <BookIcon className="w-6 h-6" style={{ color: initialProgress.classColor }} />
+              {(() => {
+                const classeInfo = DEFAULT_CLASSES.find(c => c.id === initialProgress.classId);
+                return classeInfo?.imagem ? (
+                  <img
+                    src={classeInfo.imagem}
+                    alt={classeInfo.nome}
+                    className="w-12 h-12 object-contain"
+                  />
+                ) : (
+                  <BookIcon className="w-6 h-6" style={{ color: initialProgress.classColor }} />
+                );
+              })()}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium" style={{ color: 'var(--text-color)' }}>{initialProgress.className}</p>
