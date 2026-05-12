@@ -2,14 +2,16 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Calendar, User, Home, Image, Info, Mic, Trophy } from 'lucide-react';
+import { Users, Calendar, User, Home, Image, Info, Mic, Trophy, ChevronRight } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { UnitHeader, TabsNavigation, ScoreCard, RankingModal } from '@/components/unidades';
+import { MembroDetailModal } from '@/components/membros';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppStatsCard } from '@/components/ui/AppStatsCard';
 import { AppButton } from '@/components/ui/AppButton';
 import { cn } from '@/utils/cn';
+import { Usuario } from '@/types';
 
 interface Tab {
   id: string;
@@ -32,12 +34,116 @@ const scoreItems = [
 
 const totalScore = scoreItems.reduce((acc, item) => acc + item.score, 0);
 
-const members = [
-  { id: '1', nome: 'Lucas Silva', funcao: 'Capitão', ativo: true },
-  { id: '2', nome: 'Ana Costa', funcao: 'Conselheiro', ativo: true },
-  { id: '3', nome: 'Pedro Santos', funcao: 'Secretário', ativo: true },
-  { id: '4', nome: 'Maria Oliveira', funcao: 'Membro', ativo: true },
-  { id: '5', nome: 'João Ferreira', funcao: 'Membro', ativo: false },
+const members: Usuario[] = [
+  {
+    id: '1',
+    nome: 'Lucas Silva',
+    sexo: 'M',
+    dataNascimento: new Date('2012-03-15'),
+    telefone: '(11) 99999-1111',
+    email: 'lucas@email.com',
+    ativo: true,
+    clubeId: '1',
+    dataCadastro: new Date('2022-01-15'),
+    classesAtuais: [{ classeId: '5', dataInicio: new Date('2025-01-15') }],
+    classesConcluidas: [
+      { classeId: '1', dataInicio: new Date('2022-01-15'), dataConclusao: new Date('2022-03-20'), concluido: true },
+      { classeId: '2', dataInicio: new Date('2022-03-21'), dataConclusao: new Date('2022-06-15'), concluido: true },
+    ],
+    cargos: [{ tipo: 'CAPITAO', dataAtribuicao: new Date('2024-01-01'), unidadeId: '1', ativo: true }],
+    unidadeAtualId: '1',
+    unidadesAnteriores: [],
+    especialidadesConcluidas: [],
+    transicoes: [],
+  },
+  {
+    id: '2',
+    nome: 'Ana Costa',
+    sexo: 'F',
+    dataNascimento: new Date('2013-07-22'),
+    telefone: '(11) 99999-2222',
+    email: 'ana@email.com',
+    ativo: true,
+    clubeId: '1',
+    dataCadastro: new Date('2021-06-01'),
+    classesAtuais: [{ classeId: '6', dataInicio: new Date('2024-11-01') }],
+    classesConcluidas: [
+      { classeId: '1', dataInicio: new Date('2021-06-01'), dataConclusao: new Date('2021-08-15'), concluido: true },
+      { classeId: '2', dataInicio: new Date('2021-08-16'), dataConclusao: new Date('2021-11-20'), concluido: true },
+      { classeId: '3', dataInicio: new Date('2021-11-21'), dataConclusao: new Date('2022-02-28'), concluido: true },
+      { classeId: '4', dataInicio: new Date('2022-03-01'), dataConclusao: new Date('2022-06-15'), concluido: true },
+      { classeId: '5', dataInicio: new Date('2022-06-16'), dataConclusao: new Date('2022-10-30'), concluido: true },
+    ],
+    cargos: [{ tipo: 'CONSELHEIRO', dataAtribuicao: new Date('2024-01-01'), unidadeId: '1', ativo: true }],
+    unidadeAtualId: '1',
+    unidadesAnteriores: [],
+    especialidadesConcluidas: ['esp1', 'esp2'],
+    transicoes: [],
+  },
+  {
+    id: '3',
+    nome: 'Pedro Santos',
+    sexo: 'M',
+    dataNascimento: new Date('2014-01-10'),
+    ativo: true,
+    clubeId: '1',
+    dataCadastro: new Date('2023-03-10'),
+    classesAtuais: [{ classeId: '4', dataInicio: new Date('2025-01-15') }],
+    classesConcluidas: [
+      { classeId: '1', dataInicio: new Date('2023-03-10'), dataConclusao: new Date('2023-05-20'), concluido: true },
+      { classeId: '2', dataInicio: new Date('2023-05-21'), dataConclusao: new Date('2023-08-15'), concluido: true },
+      { classeId: '3', dataInicio: new Date('2023-08-16'), dataConclusao: new Date('2024-01-10'), concluido: true },
+    ],
+    cargos: [
+      { tipo: 'SECRETARIO', dataAtribuicao: new Date('2024-01-01'), unidadeId: '1', ativo: true },
+      { tipo: 'DESBRAVADOR', dataAtribuicao: new Date('2023-03-10'), unidadeId: '1', ativo: true },
+    ],
+    unidadeAtualId: '1',
+    unidadesAnteriores: [],
+    especialidadesConcluidas: [],
+    transicoes: [],
+  },
+  {
+    id: '4',
+    nome: 'Maria Oliveira',
+    sexo: 'F',
+    dataNascimento: new Date('2015-09-05'),
+    ativo: true,
+    clubeId: '1',
+    dataCadastro: new Date('2024-02-01'),
+    classesAtuais: [{ classeId: '2', dataInicio: new Date('2024-02-01') }],
+    classesConcluidas: [
+      { classeId: '1', dataInicio: new Date('2024-02-01'), dataConclusao: new Date('2024-04-15'), concluido: true },
+    ],
+    cargos: [{ tipo: 'DESBRAVADOR', dataAtribuicao: new Date('2024-02-01'), unidadeId: '1', ativo: true }],
+    unidadeAtualId: '1',
+    unidadesAnteriores: [],
+    especialidadesConcluidas: [],
+    transicoes: [],
+    responsavel: { nome: 'Carlos Oliveira', telefone: '(11) 88888-9999', parentesco: 'Pai' },
+  },
+  {
+    id: '5',
+    nome: 'João Ferreira',
+    sexo: 'M',
+    dataNascimento: new Date('2011-11-30'),
+    ativo: false,
+    clubeId: '1',
+    dataCadastro: new Date('2020-01-15'),
+    dataDesligamento: new Date('2024-12-01'),
+    motivoDesligamento: 'Transferência',
+    classesAtuais: [],
+    classesConcluidas: [
+      { classeId: '1', dataInicio: new Date('2020-01-15'), dataConclusao: new Date('2020-03-20'), concluido: true },
+      { classeId: '2', dataInicio: new Date('2020-03-21'), dataConclusao: new Date('2020-06-15'), concluido: true },
+      { classeId: '3', dataInicio: new Date('2020-06-16'), dataConclusao: new Date('2020-09-10'), concluido: true },
+    ],
+    cargos: [{ tipo: 'DESBRAVADOR', dataAtribuicao: new Date('2020-01-15'), ativo: false }],
+    unidadeAtualId: undefined,
+    unidadesAnteriores: [{ unidadeId: '1', dataEntrada: new Date('2020-01-15'), dataSaida: new Date('2024-12-01') }],
+    especialidadesConcluidas: [],
+    transicoes: [],
+  },
 ];
 
 // Mock data - em produção viria da API
@@ -56,6 +162,7 @@ const mockUnit = {
 export default function UnitDetailPage() {
   const [activeTab, setActiveTab] = useState('resumo');
   const [showRanking, setShowRanking] = useState(false);
+  const [selectedMembro, setSelectedMembro] = useState<Usuario | null>(null);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -115,11 +222,20 @@ export default function UnitDetailPage() {
             className="space-y-3"
           >
             {members.map((member) => (
-              <AppCard key={member.id} hover className="flex items-center gap-4">
+              <AppCard
+                key={member.id}
+                hover
+                className="flex items-center gap-4 cursor-pointer"
+                onClick={() => setSelectedMembro(member)}
+              >
                 <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ background: `linear-gradient(135deg, ${mockUnit.cores[0]}, ${mockUnit.cores[2]})` }}
                 >
-                  <Users className="w-6 h-6 text-white" />
+                  {member.foto ? (
+                    <img src={member.foto} alt={member.nome} className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <span className="text-white font-bold">{member.nome.charAt(0)}</span>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -132,8 +248,13 @@ export default function UnitDetailPage() {
                       {member.ativo ? 'Ativo' : 'Inativo'}
                     </AppBadge>
                   </div>
-                  <p className="text-sm text-muted">{member.funcao}</p>
+                  <p className="text-sm text-muted">
+                    {member.cargos?.find(c => c.ativo)?.tipo === 'CAPITAO' ? 'Capitão' :
+                     member.cargos?.find(c => c.ativo)?.tipo === 'CONSELHEIRO' ? 'Conselheiro' :
+                     member.cargos?.find(c => c.ativo)?.tipo === 'SECRETARIO' ? 'Secretário' : 'Desbravador'}
+                  </p>
                 </div>
+                <ChevronRight className="w-5 h-5 text-muted flex-shrink-0" />
               </AppCard>
             ))}
           </motion.div>
@@ -265,6 +386,13 @@ export default function UnitDetailPage() {
         unidadeNome={mockUnit.nome}
         unidadeCores={mockUnit.cores}
         membros={members}
+      />
+
+      <MembroDetailModal
+        isOpen={!!selectedMembro}
+        onClose={() => setSelectedMembro(null)}
+        membro={selectedMembro}
+        unidadeCores={mockUnit.cores}
       />
     </AppLayout>
   );

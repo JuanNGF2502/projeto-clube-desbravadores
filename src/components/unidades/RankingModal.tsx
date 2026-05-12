@@ -23,7 +23,7 @@ interface RankingModalProps {
   unidadeId: string;
   unidadeNome: string;
   unidadeCores: string[];
-  membros: { id: string; nome: string; funcao: string }[];
+  membros: { id: string; nome: string; funcao?: string }[];
 }
 
 type TabMode = 'ranking' | 'avaliar';
