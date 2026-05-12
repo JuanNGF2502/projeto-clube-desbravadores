@@ -57,6 +57,7 @@ interface MemberClass {
   descricao?: string;
   ordem: number;
   cor: string;
+  imagem?: string;
   completedBy: number;
   progress: number;
   members: Member[];
@@ -393,10 +394,18 @@ export default function ClassesPage() {
                 >
                   <div className="flex items-center gap-4">
                     <div
-                      className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                      className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
                       style={{ backgroundColor: `${classe.cor}20` }}
                     >
-                      <BookOpen className="w-7 h-7" style={{ color: classe.cor }} />
+                      {classe.imagem ? (
+                        <img
+                          src={classe.imagem}
+                          alt={classe.nome}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <BookOpen className="w-7 h-7" style={{ color: classe.cor }} />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -514,10 +523,18 @@ export default function ClassesPage() {
         {selectedClass && (
           <div className="space-y-4">
             <div
-              className="h-24 rounded-xl flex items-center justify-center"
+              className="h-24 rounded-xl flex items-center justify-center overflow-hidden"
               style={{ backgroundColor: `${selectedClass.cor}20` }}
             >
-              <BookOpen className="w-12 h-12" style={{ color: selectedClass.cor }} />
+              {selectedClass.imagem ? (
+                <img
+                  src={selectedClass.imagem}
+                  alt={selectedClass.nome}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <BookOpen className="w-12 h-12" style={{ color: selectedClass.cor }} />
+              )}
             </div>
 
             <p className="text-sm text-muted">{selectedClass.descricao}</p>

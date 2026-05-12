@@ -307,6 +307,7 @@ export interface Classe {
   cor: string;
   requisitos?: string[];
   classesPreRequisito?: string[];
+  imagem?: string;
 }
 
 export const DEFAULT_CLASSES: Classe[] = [
@@ -317,6 +318,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     ordem: 1,
     cor: '#22C55E',
     classesPreRequisito: [],
+    imagem: '/images/amigo-150x150.png',
   },
   {
     id: '2',
@@ -325,6 +327,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     ordem: 2,
     cor: '#3B82F6',
     classesPreRequisito: ['1'],
+    imagem: '/images/companheiro-150x150.png',
   },
   {
     id: '3',
@@ -333,6 +336,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     ordem: 3,
     cor: '#8B5CF6',
     classesPreRequisito: ['2'],
+    imagem: '/images/pesquisador-150x150.png',
   },
   {
     id: '4',
@@ -341,6 +345,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     ordem: 4,
     cor: '#F59E0B',
     classesPreRequisito: ['3'],
+    imagem: '/images/pioneiro-150x150.png',
   },
   {
     id: '5',
@@ -349,6 +354,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     ordem: 5,
     cor: '#EF4444',
     classesPreRequisito: ['4'],
+    imagem: '/images/excursionista-150x150.png',
   },
   {
     id: '6',
@@ -357,6 +363,7 @@ export const DEFAULT_CLASSES: Classe[] = [
     ordem: 6,
     cor: '#C6A15B',
     classesPreRequisito: ['5'],
+    imagem: '/images/guia-150x150.png',
   },
 ];
 

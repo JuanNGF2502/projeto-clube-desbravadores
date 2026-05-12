@@ -121,18 +121,27 @@ export function MembroCard({
 
               {classesAtuais.length > 0 && (
                 <div className="flex items-center gap-1">
-                  <BookOpen className="w-3 h-3" />
                   {classesAtuais.map((classe, i) => classe && (
-                    <span
+                    <div
                       key={classe.id}
-                      className="px-1.5 py-0.5 rounded-full"
-                      style={{
-                        backgroundColor: `${classe.cor}20`,
-                        color: classe.cor,
-                      }}
+                      className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0"
+                      title={classe.nome}
                     >
-                      {classe.nome}{i < classesAtuais.length - 1 ? ',' : ''}
-                    </span>
+                      {classe.imagem ? (
+                        <img
+                          src={classe.imagem}
+                          alt={classe.nome}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center"
+                          style={{ backgroundColor: classe.cor }}
+                        >
+                          <span className="text-[10px] text-white font-bold">{i + 1}</span>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
