@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Users, Search, Image, Mic } from 'lucide-react';
+import { Users, Search, Image, Mic, Settings } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -164,13 +164,23 @@ export default function UnitsPage() {
 
   return (
     <AppLayout title="Unidades" subtitle={`${units.length} unidades cadastradas`}>
-      <AppInput
-        placeholder="Buscar unidade..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        leftIcon={<Search className="w-4 h-4" />}
-        className="mb-4"
-      />
+      <div className="flex gap-2 mb-4">
+        <AppInput
+          placeholder="Buscar unidade..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          leftIcon={<Search className="w-4 h-4" />}
+          className="flex-1"
+        />
+        <AppButton
+          variant="secondary"
+          onClick={() => router.push('/unidades/gerenciar')}
+          className="flex-shrink-0"
+          title="Gerenciar unidades"
+        >
+          <Settings className="w-5 h-5" />
+        </AppButton>
+      </div>
 
       {filteredUnits.length === 0 ? (
         <AppEmptyState

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight } from "lucide-react";
+import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AppCard } from "@/components/ui/AppCard";
 import { AppButton } from "@/components/ui/AppButton";
@@ -73,9 +73,10 @@ export default function ProfilePage() {
   };
 
   const settingsItems = [
-    { label: "Meus Dados", icon: User, onClick: () => {} },
+    //{ label: "Meus Dados", icon: User, onClick: () => {} },
+    { label: "Gerenciar Unidades", icon: UserCog, onClick: () => router.push('/unidades/gerenciar') },
     { label: "Membros do Clube", icon: UserPlus, onClick: () => router.push('/membros') },
-    { label: "Segurança", icon: ShieldCheck, onClick: () => {} },
+    //{ label: "Segurança", icon: ShieldCheck, onClick: () => {} },
     { label: "Sair", icon: LogOut, variant: "danger", onClick: () => addToast({ type: "info", title: "Sair", message: "Funcionalidade em breve" }) },
   ];
 
@@ -143,50 +144,6 @@ export default function ProfilePage() {
         </AppCard>
       </motion.div>
 
-      {/* Units Management */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.15 }}
-        className="mt-8 space-y-3"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold" style={{ color: 'var(--text-color)' }}>Unidades</h3>
-          <AppButton size="sm" onClick={openCreateModal} leftIcon={<Plus className="w-4 h-4" />}>
-            Nova
-          </AppButton>
-        </div>
-        <div className="space-y-2">
-          {units.map((unit) => (
-            <AppCard key={unit.id} className="p-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: unit.cores.length === 1
-                      ? unit.cores[0]
-                      : `linear-gradient(135deg, ${unit.cores[0]}, ${unit.cores[unit.cores.length - 1]})`,
-                  }}
-                >
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium" style={{ color: 'var(--text-color)' }}>{unit.nome}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>{unit.membrosCount} membros</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => handleEditUnit(unit)} className="p-2 rounded-lg hover:bg-surface transition-colors" style={{ backgroundColor: 'var(--surface-color)' }}>
-                    <Pencil className="w-4 h-4" style={{ color: 'var(--text-secondary-color)' }} />
-                  </button>
-                  <button onClick={() => handleDeleteUnit(unit)} className="p-2 rounded-lg hover:bg-danger/10 transition-colors">
-                    <Trash2 className="w-4 h-4 text-danger" />
-                  </button>
-                </div>
-              </div>
-            </AppCard>
-          ))}
-        </div>
-      </motion.div>
 
       {/* Settings */}
       <motion.div
@@ -214,58 +171,7 @@ export default function ProfilePage() {
         </div>
       </motion.div>
 
-      {/* Create/Edit Unit Modal */}
-      <AppModal
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingUnit(null); }}
-        title={editingUnit ? 'Editar Unidade' : 'Nova Unidade'}
-        description={editingUnit ? 'Faça as alterações necessárias' : 'Preencha os dados da nova unidade'}
-        size="lg"
-      >
-        <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
-          <AppInput
-            label="Nome da Unidade"
-            placeholder="Ex: Lobos, Águias..."
-            value={formData.nome}
-            onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-          />
-
-          <div>
-            <label className="text-sm font-medium ml-1 block mb-2" style={{ color: 'var(--text-secondary-color)' }}>Gênero</label>
-            <div className="flex gap-2">
-              {UNIT_GENDERS.map((g) => (
-                <button
-                  key={g.value}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, genero: g.value as Unit['genero'] })}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
-                  style={{
-                    backgroundColor: formData.genero === g.value ? 'var(--primary)' : 'var(--card-color)',
-                    color: formData.genero === g.value ? 'var(--bg)' : 'var(--text-secondary-color)',
-                    border: `1px solid ${formData.genero === g.value ? 'transparent' : 'var(--border-color)'}`,
-                  }}
-                >
-                  {g.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium ml-1 block mb-2" style={{ color: 'var(--text-secondary-color)' }}>Cores</label>
-            <ColorPicker colors={formData.cores} onChange={(colors) => setFormData({ ...formData, cores: colors })} maxColors={5} />
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <AppButton variant="secondary" onClick={() => { setIsModalOpen(false); setEditingUnit(null); }} className="flex-1">
-              Cancelar
-            </AppButton>
-            <AppButton onClick={handleSaveUnit} className="flex-1">
-              {editingUnit ? 'Salvar' : 'Criar'}
-            </AppButton>
-          </div>
-        </div>
-      </AppModal>
+      
     </AppLayout>
   );
 }
