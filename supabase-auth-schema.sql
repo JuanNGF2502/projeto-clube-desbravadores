@@ -23,16 +23,20 @@ CREATE INDEX IF NOT EXISTS idx_profiles_unidade ON profiles(unidade_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 
 -- Função para criar profile automaticamente após signup
+-- Versão mais robusta que não falha se a tabela não existir
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.profiles (id, nome, email, role)
-    VALUES (
-        NEW.id,
-        COALESCE(NEW.raw_user_meta_data->>'nome', SPLIT_PART(NEW.email, '@', 1)),
-        NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'role', 'DESBRAVADOR')
-    );
+    -- Verificar se a tabela existe
+    IF to_regclass('public.profiles') IS NOT NULL THEN
+        INSERT INTO public.profiles (id, nome, email, role)
+        VALUES (
+            NEW.id,
+            COALESCE(NEW.raw_user_meta_data->>'nome', SPLIT_PART(NEW.email, '@', 1)),
+            NEW.email,
+            COALESCE(NEW.raw_user_meta_data->>'role', 'DESBRAVADOR')
+        ) ON CONFLICT (id) DO NOTHING;
+    END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -47,16 +51,19 @@ CREATE TRIGGER on_auth_user_created
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 -- Usuários podem ver seus próprios dados
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 CREATE POLICY "Users can view own profile"
     ON profiles FOR SELECT
     USING (auth.uid() = id);
 
 -- Usuários podem atualizar seus próprios dados
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile"
     ON profiles FOR UPDATE
     USING (auth.uid() = id);
 
 -- Apenas admins podem ver todos os profiles
+DROP POLICY IF EXISTS "Admins can view all profiles" ON profiles;
 CREATE POLICY "Admins can view all profiles"
     ON profiles FOR SELECT
     USING (
@@ -67,6 +74,7 @@ CREATE POLICY "Admins can view all profiles"
     );
 
 -- Apenas admins podem modificar roles
+DROP POLICY IF EXISTS "Admins can update roles" ON profiles;
 CREATE POLICY "Admins can update roles"
     ON profiles FOR UPDATE
     USING (
@@ -76,16 +84,5 @@ CREATE POLICY "Admins can update roles"
         )
     );
 
--- ============================================
--- EMAIL VERIFICATION
--- ============================================
-
--- Habilitar verificação de email
+-- Habilitar verificação de email (opcional)
 ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at TIMESTAMPTZ;
-
--- ============================================
--- SENHA
--- ============================================
-
--- O Supabase Auth já gerencia senhas com bcrypt
--- Não precisamos de tabela adicional

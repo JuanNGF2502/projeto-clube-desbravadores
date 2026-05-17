@@ -52,13 +52,28 @@ export default function LoginPage() {
 
     try {
       if (isRegistering) {
+        if (password.length < 8) {
+          addToast({
+            type: 'error',
+            title: 'Senha muito curta',
+            message: 'A senha deve ter pelo menos 8 caracteres',
+          });
+          setIsLoading(false);
+          return;
+        }
+
         const { error } = await signUp(email, password, nome, selectedRole);
 
         if (error) {
+          console.error('Signup error:', error);
+          let errorMessage = error.message;
+          if (error.message.includes('already registered')) {
+            errorMessage = 'Este email já está cadastrado';
+          }
           addToast({
             type: 'error',
             title: 'Erro no cadastro',
-            message: error.message,
+            message: errorMessage,
           });
         } else {
           addToast({
@@ -273,7 +288,7 @@ export default function LoginPage() {
             <AppSelect
               label="Tipo de Usuário"
               value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+              onChange={(value) => setSelectedRole(value as UserRole)}
               options={roleOptions}
             />
           )}
