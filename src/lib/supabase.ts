@@ -14,8 +14,6 @@ export const supabaseOptions = {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    // redirect to login on auth errors
-    flowType: 'pkce',
   },
 };
 

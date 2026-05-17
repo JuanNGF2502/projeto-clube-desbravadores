@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { AppInput } from '@/components/ui/AppInput';
@@ -10,6 +11,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useAuth, UserRole } from '@/hooks';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
@@ -85,9 +87,13 @@ export default function LoginPage() {
           setNome('');
         }
       } else {
-        const { error } = await signIn(email, password);
+        console.log('Attempting login with:', email);
 
-        if (error) {
+        try {
+          const { error } = await signIn(email, password);
+          console.log('Login result:', { error });
+
+          if (error) {
           if (error.message.includes('Invalid login credentials')) {
             addToast({
               type: 'error',
@@ -114,7 +120,7 @@ export default function LoginPage() {
             message: 'Bem-vindo ao Sistema de Desbravadores',
           });
 
-          window.location.href = '/dashboard';
+          router.push('/dashboard');
         }
       }
     } catch (error) {
