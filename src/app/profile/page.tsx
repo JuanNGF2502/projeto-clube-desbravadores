@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog } from "lucide-react";
+import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog, BookOpen, Mail } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AppCard } from "@/components/ui/AppCard";
 import { AppButton } from "@/components/ui/AppButton";
@@ -13,13 +13,23 @@ import { AppTextarea } from "@/components/ui/AppInput";
 import { ColorPicker } from "@/components/ui/ColorPicker";
 import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useAuth, Profile } from "@/hooks";
 import { cn } from "@/utils/cn";
 import { Unit, UNIT_GENDERS, DEFAULT_UNIT_COLORS } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { addToast } = useToast();
   const { theme, toggleTheme } = useTheme();
+  const { user, profile, signOut, isAdmin } = useAuth();
+
+  // Verificar se é uma redefinição de senha
+  const isResetPassword = searchParams.get('reset') === 'true';
+  const [showResetPassword, setShowResetPassword] = useState(isResetPassword);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Unit management state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -30,7 +40,7 @@ export default function ProfilePage() {
   ]);
   const [formData, setFormData] = useState({
     nome: '',
-    genero: 'M' as 'M' | 'F' | 'MISTA',
+    genero: 'M' as 'M' | 'F',
     cores: [...DEFAULT_UNIT_COLORS],
     gritoDeGuerra: '',
     significadoLogo: '',
@@ -72,13 +82,94 @@ export default function ProfilePage() {
     setIsModalOpen(true);
   };
 
+  const handleLogout = async () => {
+    await signOut();
+    router.push('/login');
+  };
+
+  const handlePasswordReset = async () => {
+    if (newPassword !== confirmPassword) {
+      addToast({ type: 'error', title: 'Erro', message: 'As senhas não coincidem' });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      addToast({ type: 'error', title: 'Erro', message: 'Senha deve ter pelo menos 6 caracteres' });
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        addToast({ type: 'error', title: 'Erro', message: error.message });
+      } else {
+        addToast({ type: 'success', title: 'Senha atualizada', message: 'Sua senha foi alterada com sucesso' });
+        setShowResetPassword(false);
+        router.replace('/profile');
+      }
+    } catch (error) {
+      addToast({ type: 'error', title: 'Erro', message: 'Ocorreu um erro ao redefinir a senha' });
+    }
+  };
+
+  // Obter label do role
+  const getRoleLabel = (role?: string) => {
+    switch (role) {
+      case 'ADMIN': return 'Administrador';
+      case 'DIRIGENTE': return 'Dirigente';
+      case 'LIDER': return 'Líder';
+      default: return 'Desbravador';
+    }
+  };
+
   const settingsItems = [
-    //{ label: "Meus Dados", icon: User, onClick: () => {} },
-    { label: "Gerenciar Unidades", icon: UserCog, onClick: () => router.push('/unidades/gerenciar') },
-    { label: "Membros do Clube", icon: UserPlus, onClick: () => router.push('/membros') },
-    //{ label: "Segurança", icon: ShieldCheck, onClick: () => {} },
-    { label: "Sair", icon: LogOut, variant: "danger", onClick: () => addToast({ type: "info", title: "Sair", message: "Funcionalidade em breve" }) },
+    ...(isAdmin ? [
+      { label: "Gerenciar Requisitos das Classes", icon: BookOpen, onClick: () => router.push('/classes/gerenciar') },
+      { label: "Gerenciar Unidades", icon: UserCog, onClick: () => router.push('/unidades/gerenciar') },
+      { label: "Membros do Clube", icon: UserPlus, onClick: () => router.push('/membros') },
+    ] : []),
+    { label: "Sair", icon: LogOut, variant: "danger", onClick: handleLogout },
   ];
+
+  // Se está redefinindo senha
+  if (showResetPassword) {
+    return (
+      <AppLayout title="Nova Senha" subtitle="Crie uma nova senha">
+        <div className="p-4 space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>
+            Digite sua nova senha abaixo.
+          </p>
+          <AppInput
+            label="Nova Senha"
+            type="password"
+            placeholder="••••••••"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+          <AppInput
+            label="Confirmar Senha"
+            type="password"
+            placeholder="••••••••"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+          <AppButton onClick={handlePasswordReset} className="w-full">
+            Alterar Senha
+          </AppButton>
+          <button
+            onClick={() => {
+              setShowResetPassword(false);
+              router.replace('/profile');
+            }}
+            className="w-full text-center text-sm text-primary"
+          >
+            Cancelar
+          </button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Perfil" subtitle="Sua conta e configurações">
@@ -91,12 +182,26 @@ export default function ProfilePage() {
         {/* Avatar */}
         <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-yellow-400 p-1">
           <div className="w-full h-full rounded-full flex items-center justify-center overflow-hidden" style={{ backgroundColor: 'var(--card-color)' }}>
-            <User size={48} style={{ color: 'var(--text-secondary-color)' }} />
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <User size={48} style={{ color: 'var(--text-secondary-color)' }} />
+            )}
           </div>
         </div>
         <div className="text-center">
-          <h2 className="text-xl font-bold" style={{ color: 'var(--text-color)' }}>João Silva</h2>
-          <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Membro Gold Premium</p>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--text-color)' }}>
+            {profile?.nome || user?.email?.split('@')[0] || 'Usuário'}
+          </h2>
+          <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>
+            {getRoleLabel(profile?.role)}
+          </p>
+          {profile?.email && (
+            <p className="text-xs flex items-center justify-center gap-1 mt-1" style={{ color: 'var(--text-secondary-color)' }}>
+              <Mail size={12} />
+              {profile.email}
+            </p>
+          )}
         </div>
       </motion.div>
 
@@ -171,7 +276,7 @@ export default function ProfilePage() {
         </div>
       </motion.div>
 
-      
+
     </AppLayout>
   );
 }

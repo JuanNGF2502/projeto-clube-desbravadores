@@ -2,20 +2,26 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { AppInput } from '@/components/ui/AppInput';
 import { AppButton } from '@/components/ui/AppButton';
+import { AppSelect } from '@/components/ui/AppSelect';
 import { useToast } from '@/components/ui/Toast';
+import { useAuth, UserRole } from '@/hooks';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [nome, setNome] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; nome?: string }>({});
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>('DESBRAVADOR');
   const { addToast } = useToast();
+  const { signIn, signUp } = useAuth();
 
   const validateForm = () => {
-    const newErrors: { email?: string; password?: string } = {};
+    const newErrors: { email?: string; password?: string; nome?: string } = {};
 
     if (!email) {
       newErrors.email = 'Email é obrigatório';
@@ -29,6 +35,10 @@ export default function LoginPage() {
       newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
     }
 
+    if (isRegistering && !nome.trim()) {
+      newErrors.nome = 'Nome é obrigatório';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -40,19 +50,70 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      if (isRegistering) {
+        const { error } = await signUp(email, password, nome, selectedRole);
 
-    addToast({
-      type: 'success',
-      title: 'Login realizado!',
-      message: 'Bem-vindo ao Sistema de Desbravadores',
-    });
+        if (error) {
+          addToast({
+            type: 'error',
+            title: 'Erro no cadastro',
+            message: error.message,
+          });
+        } else {
+          addToast({
+            type: 'success',
+            title: 'Cadastro realizado!',
+            message: 'Verifique seu email para confirmar o cadastro.',
+          });
+          setIsRegistering(false);
+          setNome('');
+        }
+      } else {
+        const { error } = await signIn(email, password);
 
-    window.location.href = '/dashboard';
+        if (error) {
+          if (error.message.includes('Invalid login credentials')) {
+            addToast({
+              type: 'error',
+              title: 'Login falhou',
+              message: 'Email ou senha incorretos',
+            });
+          } else if (error.message.includes('Email not confirmed')) {
+            addToast({
+              type: 'warning',
+              title: 'Email não confirmado',
+              message: 'Verifique sua caixa de entrada para confirmar seu email',
+            });
+          } else {
+            addToast({
+              type: 'error',
+              title: 'Erro no login',
+              message: error.message,
+            });
+          }
+        } else {
+          addToast({
+            type: 'success',
+            title: 'Login realizado!',
+            message: 'Bem-vindo ao Sistema de Desbravadores',
+          });
+
+          window.location.href = '/dashboard';
+        }
+      }
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Ocorreu um erro inesperado',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
     if (!email) {
       addToast({
         type: 'warning',
@@ -61,12 +122,45 @@ export default function LoginPage() {
       });
       return;
     }
-    addToast({
-      type: 'info',
-      title: 'Recuperação enviada',
-      message: 'Verifique sua caixa de entrada',
-    });
+
+    setIsLoading(true);
+    try {
+      const { error } = await import('@/lib/supabase').then(m =>
+        m.supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/profile?reset=true`,
+        })
+      );
+
+      if (error) {
+        addToast({
+          type: 'error',
+          title: 'Erro',
+          message: error.message,
+        });
+      } else {
+        addToast({
+          type: 'success',
+          title: 'Email enviado',
+          message: 'Verifique sua caixa de entrada para redefinir sua senha',
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const toggleMode = () => {
+    setIsRegistering(!isRegistering);
+    setErrors({});
+    setNome('');
+  };
+
+  const roleOptions = [
+    { value: 'DESBRAVADOR', label: 'Desbravador' },
+    { value: 'LIDER', label: 'Líder' },
+    { value: 'DIRIGENTE', label: 'Dirigente' },
+    { value: 'ADMIN', label: 'Administrador' },
+  ];
 
   return (
     <div className="min-h-screen w-full max-w-md mx-auto relative flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
@@ -111,7 +205,7 @@ export default function LoginPage() {
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold gold-gradient-text mb-2"
           >
-            Desbravadores
+            {isRegistering ? 'Criar Conta' : 'Desbravadores'}
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }}
@@ -120,7 +214,7 @@ export default function LoginPage() {
             className="text-sm"
             style={{ color: 'var(--text-secondary-color)' }}
           >
-            Sistema de Gestão Premium
+            {isRegistering ? 'Preencha os dados para se cadastrar' : 'Sistema de Gestão Premium'}
           </motion.p>
         </motion.div>
 
@@ -131,6 +225,22 @@ export default function LoginPage() {
           onSubmit={handleSubmit}
           className="space-y-5"
         >
+          {isRegistering && (
+            <AppInput
+              label="Nome Completo"
+              type="text"
+              placeholder="Seu nome"
+              value={nome}
+              onChange={(e) => {
+                setNome(e.target.value);
+                if (errors.nome) setErrors({ ...errors, nome: undefined });
+              }}
+              error={errors.nome}
+              leftIcon={<UserPlus className="w-5 h-5" />}
+              autoComplete="name"
+            />
+          )}
+
           <AppInput
             label="Email"
             type="email"
@@ -156,29 +266,57 @@ export default function LoginPage() {
             }}
             error={errors.password}
             leftIcon={<Lock className="w-5 h-5" />}
-            autoComplete="current-password"
+            autoComplete={isRegistering ? 'new-password' : 'current-password'}
           />
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-sm text-primary hover:text-primary-light transition-colors"
-            >
-              Esqueceu a senha?
-            </button>
-          </div>
+          {isRegistering && (
+            <AppSelect
+              label="Tipo de Usuário"
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+              options={roleOptions}
+            />
+          )}
+
+          {!isRegistering && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-sm text-primary hover:text-primary-light transition-colors"
+              >
+                Esqueceu a senha?
+              </button>
+            </div>
+          )}
 
           <AppButton
             type="submit"
             className="w-full"
             size="lg"
             isLoading={isLoading}
-            rightIcon={<LogIn className="w-5 h-5" />}
+            rightIcon={isRegistering ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
           >
-            Entrar
+            {isRegistering ? 'Cadastrar' : 'Entrar'}
           </AppButton>
         </motion.form>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mt-6 text-center"
+        >
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="text-sm text-primary hover:text-primary-light transition-colors"
+          >
+            {isRegistering
+              ? 'Já tem uma conta? Entrar'
+              : 'Não tem uma conta? Criar conta'}
+          </button>
+        </motion.div>
 
         <motion.p
           initial={{ opacity: 0 }}

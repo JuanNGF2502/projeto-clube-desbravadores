@@ -1,0 +1,281 @@
+'use client';
+
+import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, Session, AuthError } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { useAppStore } from '@/stores/appStore';
+
+export type UserRole = 'ADMIN' | 'DIRIGENTE' | 'LIDER' | 'DESBRAVADOR';
+
+export interface Profile {
+  id: string;
+  nome: string;
+  email: string;
+  avatar_url?: string;
+  role: UserRole;
+  clube_id?: string;
+  unidade_id?: string;
+  ativo: boolean;
+}
+
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  profile: Profile | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string, nome: string, role?: UserRole) => Promise<{ error: AuthError | null }>;
+  signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
+  hasRole: (roles: UserRole[]) => boolean;
+  isAdmin: boolean;
+  isDirigente: boolean;
+  isLider: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { setClubeAtual } = useAppStore();
+
+  // Carregar sessão inicial
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+        if (currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+
+          // Buscar profile
+          await fetchProfile(currentSession.user.id);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar sessão:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSession();
+
+    // Listener para mudanças de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user || null);
+
+        if (currentSession?.user) {
+          await fetchProfile(currentSession.user.id);
+        } else {
+          setProfile(null);
+        }
+
+        setIsLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Buscar profile do usuário
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Erro ao buscar profile:', error);
+        return;
+      }
+
+      setProfile(data as Profile);
+
+      // Se o usuário tem clube associado, atualizar o store
+      if (data?.clube_id) {
+        const { data: clube } = await supabase
+          .from('clubes')
+          .select('id, nome, cidade, estado')
+          .eq('id', data.clube_id)
+          .single();
+
+        if (clube) {
+          setClubeAtual(clube);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar profile:', error);
+    }
+  };
+
+  // Login
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      if (data.user) {
+        await fetchProfile(data.user.id);
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as AuthError };
+    }
+  };
+
+  // Cadastro
+  const signUp = async (
+    email: string,
+    password: string,
+    nome: string,
+    role: UserRole = 'DESBRAVADOR'
+  ) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            nome,
+            role,
+          },
+        },
+      });
+
+      if (error) {
+        return { error };
+      }
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as AuthError };
+    }
+  };
+
+  // Logout
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
+
+  // Atualizar profile
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!user) {
+      return { error: new Error('Usuário não autenticado') };
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        return { error };
+      }
+
+      // Recarregar profile
+      await fetchProfile(user.id);
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  // Verificar se tem role específica
+  const hasRole = (roles: UserRole[]) => {
+    if (!profile) return false;
+    return roles.includes(profile.role);
+  };
+
+  // Helpers
+  const isAdmin = hasRole(['ADMIN']);
+  const isDirigente = hasRole(['ADMIN', 'DIRIGENTE']);
+  const isLider = hasRole(['ADMIN', 'DIRIGENTE', 'LIDER']);
+
+  const value: AuthContextType = {
+    user,
+    session,
+    profile,
+    isLoading,
+    isAuthenticated: !!user && !!session,
+    signIn,
+    signUp,
+    signOut,
+    updateProfile,
+    hasRole,
+    isAdmin,
+    isDirigente,
+    isLider,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Hook para usar a autenticação
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
+}
+
+// Hook para proteger rotas (retorna true se não autenticado)
+export function useRequireAuth(redirectTo: string = '/login') {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      window.location.href = redirectTo;
+    }
+  }, [isAuthenticated, isLoading, redirectTo]);
+
+  return { isAuthenticated, isLoading };
+}
+
+// Hook para verificar permissões
+export function usePermission(requiredRoles: UserRole[]) {
+  const { hasRole, isLoading } = useAuth();
+
+  return {
+    hasPermission: hasRole(requiredRoles),
+    isLoading,
+  };
+}
