@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, UserPlus, Loader2 } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus } from 'lucide-react';
 import { AppInput } from '@/components/ui/AppInput';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppSelect } from '@/components/ui/AppSelect';
@@ -54,6 +54,7 @@ export default function LoginPage() {
 
     try {
       if (isRegistering) {
+        // Signup
         if (password.length < 8) {
           addToast({
             type: 'error',
@@ -87,13 +88,12 @@ export default function LoginPage() {
           setNome('');
         }
       } else {
+        // Signin
         console.log('Attempting login with:', email);
+        const { error } = await signIn(email, password);
+        console.log('Login result:', { error });
 
-        try {
-          const { error } = await signIn(email, password);
-          console.log('Login result:', { error });
-
-          if (error) {
+        if (error) {
           if (error.message.includes('Invalid login credentials')) {
             addToast({
               type: 'error',
@@ -119,11 +119,11 @@ export default function LoginPage() {
             title: 'Login realizado!',
             message: 'Bem-vindo ao Sistema de Desbravadores',
           });
-
           router.push('/dashboard');
         }
       }
     } catch (error) {
+      console.error('Login error:', error);
       addToast({
         type: 'error',
         title: 'Erro',
@@ -165,6 +165,13 @@ export default function LoginPage() {
           message: 'Verifique sua caixa de entrada para redefinir sua senha',
         });
       }
+    } catch (err) {
+      console.error('Password reset error:', err);
+      addToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Ocorreu um erro ao enviar o email',
+      });
     } finally {
       setIsLoading(false);
     }
