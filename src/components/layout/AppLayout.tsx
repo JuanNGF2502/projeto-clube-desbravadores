@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
 import { motion } from 'framer-motion';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+import { ClubeSelector } from '@/components/ui/ClubeSelector';
 import { Home, Users, BookOpen, User } from 'lucide-react';
 
 interface NavItem {
@@ -88,7 +89,10 @@ export function AppLayout({
               )}
             </div>
           </div>
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+          <div className="flex items-center gap-2">
+            <ClubeSelector />
+            {actions && actions}
+          </div>
         </div>
       </header>
 

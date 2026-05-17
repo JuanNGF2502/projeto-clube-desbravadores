@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Phone, Mail, MapPin, Shield, BookOpen, Users, Check, ArrowRight, ArrowLeft, ChevronRight } from 'lucide-react';
+import { User, Phone, Mail, MapPin, Shield, BookOpen, Users, Check, ArrowRight, ArrowLeft, Pencil, Loader2 } from 'lucide-react';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppCard } from '@/components/ui/AppCard';
@@ -25,16 +25,20 @@ interface MembroFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (usuario: Partial<Usuario>) => void;
+  onEdit?: () => void;
   usuario?: Usuario | null;
   unidades: Unit[];
+  isSaving?: boolean;
 }
 
 export function MembroFormModal({
   isOpen,
   onClose,
   onSave,
+  onEdit,
   usuario,
   unidades,
+  isSaving = false,
 }: MembroFormModalProps) {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -59,6 +63,7 @@ export function MembroFormModal({
     categoriaMembro: '' as 'DESBRAVADOR' | 'LIDER' | '',
     cargos: [] as CargoTipo[],
     cargoObservacao: '',
+    ativo: true,
   });
 
   const totalSteps = 4;
@@ -67,13 +72,26 @@ export function MembroFormModal({
     if (usuario) {
       const cargosAtivos = usuario.cargos?.filter(c => c.ativo) || [];
       let categoria: 'DESBRAVADOR' | 'LIDER' | '' = '';
+
       if (cargosAtivos.length > 0) {
         const temCargoLider = cargosAtivos.some(c => {
           const info = getCargoByTipo(c.tipo);
           return info?.categoria === 'LIDER' || info?.categoria === 'DIRIGENTE';
         });
         categoria = temCargoLider ? 'LIDER' : 'DESBRAVADOR';
+      } else if (usuario.classesAtuais && usuario.classesAtuais.length > 0) {
+        categoria = 'DESBRAVADOR';
       }
+
+      const classesAtuaisIds = usuario.classesAtuais?.map(c => {
+        if (typeof c === 'string') return c;
+        return c.classeId ? String(c.classeId) : '';
+      }).filter(Boolean) || [];
+
+      const cargosList = (cargosAtivos.map(c => {
+        if (typeof c === 'string') return c as CargoTipo;
+        return String(c.tipo) as CargoTipo;
+      }) || []).filter(Boolean);
 
       setFormData({
         nome: usuario.nome,
@@ -81,7 +99,9 @@ export function MembroFormModal({
         sexo: usuario.sexo,
         dataNascimento: usuario.dataNascimento instanceof Date
           ? usuario.dataNascimento.toISOString().split('T')[0]
-          : new Date(usuario.dataNascimento).toISOString().split('T')[0],
+          : usuario.dataNascimento
+            ? new Date(usuario.dataNascimento).toISOString().split('T')[0]
+            : '',
         telefone: usuario.telefone || '',
         email: usuario.email || '',
         logradouro: usuario.endereco?.logradouro || '',
@@ -95,10 +115,11 @@ export function MembroFormModal({
         responsavelParentesco: usuario.responsavel?.parentesco || '',
         observacoes: usuario.observacoes || '',
         unidadeId: usuario.unidadeAtualId || '',
-        classesAtuais: usuario.classesAtuais?.map(c => c.classeId) || [],
+        classesAtuais: classesAtuaisIds,
         categoriaMembro: categoria,
-        cargos: cargosAtivos.map(c => c.tipo),
+        cargos: cargosList,
         cargoObservacao: '',
+        ativo: usuario.ativo !== undefined ? usuario.ativo : true,
       });
     } else {
       setFormData({
@@ -107,12 +128,13 @@ export function MembroFormModal({
         cidade: '', estado: '', cep: '', responsavelNome: '',
         responsavelTelefone: '', responsavelParentesco: '', observacoes: '',
         unidadeId: '', classesAtuais: [], categoriaMembro: '', cargos: [], cargoObservacao: '',
+        ativo: true,
       });
     }
     setStep(1);
   }, [usuario, isOpen]);
 
-  const updateField = (field: string, value: string | string[]) => {
+  const updateField = (field: string, value: string | string[] | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -153,7 +175,7 @@ export function MembroFormModal({
       dataNascimento: new Date(formData.dataNascimento),
       telefone: formData.telefone || undefined,
       email: formData.email || undefined,
-      ativo: true,
+      ativo: formData.ativo,
       clubeId: '1',
       dataCadastro: usuario?.dataCadastro || new Date(),
       classesAtuais: formData.classesAtuais.map(classeId => ({
@@ -189,12 +211,13 @@ export function MembroFormModal({
   };
 
   const stepLabels = ['Dados', 'Categoria', 'Cargos', 'Finalizar'];
+  const isEditing = !!usuario;
 
   return (
     <AppModal
       isOpen={isOpen}
       onClose={onClose}
-      title={usuario ? 'Editar Membro' : 'Novo Membro'}
+      title={isEditing ? 'Editar Membro' : 'Novo Membro'}
       size="lg"
       scrollable
     >
@@ -222,6 +245,20 @@ export function MembroFormModal({
               onChange={(e) => updateField('nome', e.target.value)}
               placeholder="Ex: João Silva"
             />
+
+            {isEditing && (
+              <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.ativo}
+                    onChange={(e) => updateField('ativo', e.target.checked)}
+                    className="w-4 h-4 rounded border-border text-primary"
+                  />
+                  <span className="text-sm text-text-primary">Membro ativo</span>
+                </label>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <AppSelect
@@ -355,7 +392,7 @@ export function MembroFormModal({
         </div>
       )}
 
-      {/* Step 3: Cargos */}
+      {/* Step 3: Cargos e Classes */}
       {step === 3 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -371,7 +408,8 @@ export function MembroFormModal({
             )}
           </div>
 
-          <div className="space-y-2">
+          {/* Cargos em 2 colunas */}
+          <div className="grid grid-cols-2 gap-2">
             {getCargosPorCategoria(formData.categoriaMembro as CategoriaMembro).map((cargo) => {
               const isSelected = formData.cargos.includes(cargo.tipo);
               return (
@@ -379,26 +417,26 @@ export function MembroFormModal({
                   key={cargo.tipo}
                   onClick={() => toggleCargo(cargo.tipo)}
                   className={cn(
-                    'w-full p-3 rounded-xl border-2 text-left transition-all flex items-center justify-between',
+                    'p-3 rounded-xl border-2 text-left transition-all flex items-center justify-between',
                     isSelected
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:border-primary/50'
                   )}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: cargo.cor }}
                     />
-                    <span className="font-medium text-text-primary">{cargo.nome}</span>
+                    <span className="font-medium text-text-primary text-sm truncate">{cargo.nome}</span>
                   </div>
                   <div
                     className={cn(
-                      'w-6 h-6 rounded-full flex items-center justify-center transition-all',
+                      'w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0',
                       isSelected ? 'bg-primary text-white' : 'bg-muted'
                     )}
                   >
-                    {isSelected && <Check className="w-4 h-4" />}
+                    {isSelected && <Check className="w-3 h-3" />}
                   </div>
                 </button>
               );
@@ -415,65 +453,68 @@ export function MembroFormModal({
             />
           )}
 
-          {/* Classes (se for desbravador) */}
-          {formData.categoriaMembro === 'DESBRAVADOR' && (
-            <div className="pt-4 border-t border-border">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-text-primary flex items-center gap-2">
-                  <BookOpen className="w-4 h-4" />
-                  Classes em andamento
-                </p>
-                <AppBadge variant="info" size="sm">
-                  {formData.classesAtuais.length} classe{formData.classesAtuais.length !== 1 ? 's' : ''}
-                </AppBadge>
-              </div>
-
-              <div className="space-y-2">
-                {DEFAULT_CLASSES.map((classe, index) => {
-                  const isSelected = formData.classesAtuais.includes(classe.id);
-                  const classesConcluidas = usuario?.classesConcluidas?.map(c => c.classeId) || [];
-                  const isConcluida = classesConcluidas.includes(classe.id);
-                  const podeFazer =
-                    index === 0 || isConcluida ||
-                    formData.classesAtuais.includes(DEFAULT_CLASSES[index - 1]?.id) ||
-                    classesConcluidas.includes(DEFAULT_CLASSES[index - 1]?.id);
-
-                  return (
-                    <button
-                      key={classe.id}
-                      onClick={() => podeFazer && toggleClasse(classe.id)}
-                      disabled={!podeFazer}
-                      className={cn(
-                        'w-full p-3 rounded-xl border-2 text-left transition-all flex items-center justify-between',
-                        isSelected ? 'border-primary bg-primary/10' :
-                        !podeFazer ? 'border-border opacity-50' : 'border-border hover:border-primary/50'
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
-                          style={{ backgroundColor: classe.cor }}
-                        >
-                          {index + 1}
-                        </div>
-                        <div>
-                          <span className="font-medium text-text-primary text-sm">{classe.nome}</span>
-                          {isConcluida && (
-                            <span className="ml-2 text-xs text-success">Concluída</span>
-                          )}
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Classes em 2 colunas com logos */}
+          <div className="pt-4 border-t border-border">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium text-text-primary flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                Classes em andamento
+              </p>
+              <AppBadge variant="info" size="sm">
+                {formData.classesAtuais.length} classe{formData.classesAtuais.length !== 1 ? 's' : ''}
+              </AppBadge>
             </div>
-          )}
+
+            <div className="grid grid-cols-2 gap-2">
+              {DEFAULT_CLASSES.map((classe) => {
+                const isSelected = formData.classesAtuais.includes(classe.id);
+                const classesConcluidas = usuario?.classesConcluidas?.map(c => c.classeId) || [];
+
+                return (
+                  <button
+                    key={classe.id}
+                    onClick={() => toggleClasse(classe.id)}
+                    className={cn(
+                      'p-3 rounded-xl border-2 text-left transition-all',
+                      isSelected ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+                        style={{ backgroundColor: classe.cor }}
+                      >
+                        {classe.imagem ? (
+                          <img
+                            src={classe.imagem}
+                            alt={classe.nome}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <span className="text-white text-lg font-bold">{classe.nome.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-text-primary text-sm block truncate">{classe.nome}</span>
+                        {classesConcluidas.includes(classe.id) && (
+                          <span className="text-xs text-success">Concluída</span>
+                        )}
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -507,7 +548,7 @@ export function MembroFormModal({
                     <div>
                       <p className="font-semibold text-text-primary">{unidade.nome}</p>
                       <p className="text-xs text-muted">
-                        {unidade.genero === 'M' ? 'Masculina' : unidade.genero === 'F' ? 'Feminina' : 'Mista'}
+                        {unidade.genero === 'M' ? 'Masculina' : 'Feminina'}
                       </p>
                     </div>
                   </div>
@@ -561,6 +602,12 @@ export function MembroFormModal({
                   </div>
                 </div>
               )}
+              <div className="flex justify-between">
+                <span className="text-muted">Status</span>
+                <span className={cn('font-medium', formData.ativo ? 'text-success' : 'text-danger')}>
+                  {formData.ativo ? 'Ativo' : 'Inativo'}
+                </span>
+              </div>
             </div>
           </AppCard>
         </div>
@@ -593,9 +640,14 @@ export function MembroFormModal({
             variant="primary"
             onClick={handleSubmit}
             className="flex-1"
+            disabled={isSaving}
           >
-            <Check className="w-4 h-4 mr-2" />
-            {usuario ? 'Salvar' : 'Criar Membro'}
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4 mr-2" />
+            )}
+            {isSaving ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Criar Membro'}
           </AppButton>
         )}
       </div>

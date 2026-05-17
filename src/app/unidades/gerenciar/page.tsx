@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Pencil, Trash2, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -10,52 +10,22 @@ import { AppModal } from '@/components/ui/AppModal';
 import { AppInput } from '@/components/ui/AppInput';
 import { AppTextarea } from '@/components/ui/AppInput';
 import { AppBadge } from '@/components/ui/AppBadge';
+import { AppEmptyState } from '@/components/ui/AppEmptyState';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { useToast } from '@/components/ui/Toast';
 import { Unit, UNIT_GENDERS, DEFAULT_UNIT_COLORS } from '@/types';
 import { cn } from '@/utils/cn';
+import {
+  getTodasUnidades,
+  createUnidade,
+  updateUnidade,
+  deleteUnidade,
+  toggleUnidadeAtivo
+} from '@/lib/queries';
+import { supabase } from '@/lib/supabase';
 
-const initialUnits: Unit[] = [
-  {
-    id: '1',
-    nome: 'Lobos',
-    genero: 'M',
-    cores: ['#3B82F6', '#1E40AF', '#1E3A8A'],
-    ativo: true,
-    clubeId: '1',
-    membrosCount: 12,
-    createdAt: new Date(),
-  },
-  {
-    id: '2',
-    nome: 'Águias',
-    genero: 'M',
-    cores: ['#C6A15B', '#A16207', '#854D0E'],
-    ativo: true,
-    clubeId: '1',
-    membrosCount: 8,
-    createdAt: new Date(),
-  },
-  {
-    id: '3',
-    nome: 'Leões',
-    genero: 'MISTA',
-    cores: ['#EF4444', '#B91C1C', '#991B1B'],
-    ativo: true,
-    clubeId: '1',
-    membrosCount: 15,
-    createdAt: new Date(),
-  },
-  {
-    id: '4',
-    nome: 'Corujas',
-    genero: 'F',
-    cores: ['#8B5CF6', '#6D28D9', '#5B21B6'],
-    ativo: false,
-    clubeId: '1',
-    membrosCount: 0,
-    createdAt: new Date(),
-  },
-];
+// ID fixo para desenvolvimento
+const CLUB_ID = '00000000-0000-0000-0000-000000000001';
 
 interface UnitFormData {
   nome: string;
@@ -67,7 +37,8 @@ interface UnitFormData {
 }
 
 export default function GerenciarUnidadesPage() {
-  const [units, setUnits] = useState<Unit[]>(initialUnits);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [formData, setFormData] = useState<UnitFormData>({
@@ -78,6 +49,24 @@ export default function GerenciarUnidadesPage() {
     significadoLogo: '',
     historiaNome: '',
   });
+  const { addToast } = useToast();
+
+  const carregarDados = async () => {
+    try {
+      setIsLoading(true);
+      const dados = await getTodasUnidades(CLUB_ID);
+      setUnits(dados || []);
+    } catch (error) {
+      console.error('Erro ao carregar unidades:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar unidades' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
 
   const openCreateModal = () => {
     setEditingUnit(null);
@@ -96,8 +85,8 @@ export default function GerenciarUnidadesPage() {
     setEditingUnit(unit);
     setFormData({
       nome: unit.nome,
-      genero: unit.genero,
-      cores: unit.cores,
+      genero: unit.genero as 'M' | 'F' ,
+      cores: unit.cores || [],
       gritoDeGuerra: unit.gritoDeGuerra || '',
       significadoLogo: unit.significadoLogo || '',
       historiaNome: unit.historiaNome || '',
@@ -105,61 +94,131 @@ export default function GerenciarUnidadesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteUnit = (unit: Unit) => {
-    if (confirm(`Tem certeza que deseja excluir a unidade "${unit.nome}"?`)) {
-      setUnits(units.filter(u => u.id !== unit.id));
+  const handleDeleteUnit = async (unit: Unit) => {
+    const confirmar = confirm(`Tem certeza que deseja APAGAR DEFINITIVAMENTE a unidade "${unit.nome}"? Esta ação não pode ser desfeita.`);
+    if (!confirmar) return;
+
+    try {
+      // 1. Desvincular membros_cargos
+      await supabase
+        .from('membros_cargos')
+        .update({ unidade_id: null })
+        .eq('unidade_id', unit.id);
+
+      // 2. Desvincular membros
+      await supabase
+        .from('membros')
+        .update({ unidade_id: null })
+        .eq('unidade_id', unit.id);
+
+      // 3. Desvincular membros_unidades
+      await supabase
+        .from('membros_unidades')
+        .update({ ativo: false })
+        .eq('unidade_id', unit.id);
+
+      // 4. Remover referência das avaliações (agora Permite NULL no banco)
+      await supabase
+        .from('avaliacoes')
+        .update({ unidade_id: null })
+        .eq('unidade_id', unit.id);
+
+      // 5. Excluir a unidade
+      await supabase
+        .from('unidades')
+        .delete()
+        .eq('id', unit.id);
+
+      addToast({ type: 'success', title: 'Sucesso', message: 'Unidade excluída definitivamente' });
+      await carregarDados();
+    } catch (error: any) {
+      console.error('Erro ao excluir:', error);
+      addToast({ type: 'error', title: 'Erro', message: error.message || 'Falha ao excluir unidade' });
     }
   };
 
-  const handleSaveUnit = () => {
+  const handleSaveUnit = async () => {
     if (!formData.nome.trim()) return;
 
-    if (editingUnit) {
-      setUnits(units.map(u =>
-        u.id === editingUnit.id
-          ? {
-              ...u,
-              nome: formData.nome,
-              genero: formData.genero,
-              cores: formData.cores,
-              gritoDeGuerra: formData.gritoDeGuerra,
-              significadoLogo: formData.significadoLogo,
-              historiaNome: formData.historiaNome,
-            }
-          : u
-      ));
-    } else {
-      const newUnit: Unit = {
-        id: String(Date.now()),
-        nome: formData.nome,
-        genero: formData.genero,
-        cores: formData.cores,
-        ativo: true,
-        clubeId: '1',
-        membrosCount: 0,
-        createdAt: new Date(),
-        gritoDeGuerra: formData.gritoDeGuerra,
-        significadoLogo: formData.significadoLogo,
-        historiaNome: formData.historiaNome,
-      };
-      setUnits([...units, newUnit]);
+    try {
+      if (editingUnit) {
+        await updateUnidade(editingUnit.id, {
+          nome: formData.nome,
+          genero: formData.genero as 'M' | 'F',
+          cores: formData.cores,
+          clube_id: CLUB_ID,
+          grito_de_guerra: formData.gritoDeGuerra || undefined,
+          significado_logo: formData.significadoLogo || undefined,
+          historia_nome: formData.historiaNome || undefined,
+        });
+        addToast({ type: 'success', title: 'Sucesso', message: 'Unidade atualizada' });
+      } else {
+        await createUnidade({
+          nome: formData.nome,
+          genero: formData.genero as 'M' | 'F' ,
+          cores: formData.cores,
+          clube_id: CLUB_ID,
+          grito_de_guerra: formData.gritoDeGuerra || undefined,
+          significado_logo: formData.significadoLogo || undefined,
+          historia_nome: formData.historiaNome || undefined,
+        });
+        addToast({ type: 'success', title: 'Sucesso', message: 'Unidade criada' });
+      }
+      setIsModalOpen(false);
+      setEditingUnit(null);
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar unidade' });
     }
-    setIsModalOpen(false);
-    setEditingUnit(null);
   };
 
-  const toggleUnitStatus = (unit: Unit) => {
-    setUnits(units.map(u =>
-      u.id === unit.id ? { ...u, ativo: !u.ativo } : u
-    ));
+  const toggleUnitStatus = async (unit: Unit) => {
+    try {
+      // Se estiver desativando, desvincular membros primeiro
+      if (unit.ativo) {
+        // Atualizar membros para remover referência à unidade
+        await supabase
+          .from('membros')
+          .update({ unidade_id: null })
+          .eq('unidade_id', unit.id);
+
+        // Atualizar membros_unidades para inativo
+        await supabase
+          .from('membros_unidades')
+          .update({ ativo: false })
+          .eq('unidade_id', unit.id);
+      }
+
+      await toggleUnidadeAtivo(unit.id);
+      addToast({
+        type: 'success',
+        title: 'Sucesso',
+        message: unit.ativo ? 'Unidade desativada e membros desvinculados' : 'Unidade ativada'
+      });
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao alterar status' });
+    }
   };
 
-  const getGenderLabel = (genero: Unit['genero']) => {
+  const getGenderLabel = (genero: string) => {
     return UNIT_GENDERS.find(g => g.value === genero)?.label || genero;
   };
 
   const activeUnits = units.filter(u => u.ativo);
   const inactiveUnits = units.filter(u => !u.ativo);
+
+  if (isLoading) {
+    return (
+      <AppLayout title="Gerenciar Unidades" backHref="/unidades">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Gerenciar Unidades" backHref="/unidades">
@@ -192,9 +251,9 @@ export default function GerenciarUnidadesPage() {
                       <div
                         className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{
-                          background: unit.cores.length === 1
-                            ? unit.cores[0]
-                            : `linear-gradient(135deg, ${unit.cores[0]}, ${unit.cores[unit.cores.length - 1]})`,
+                          background: (unit.cores?.length || 0) === 1
+                            ? unit.cores?.[0]
+                            : `linear-gradient(135deg, ${(unit.cores || [])[0]}, ${(unit.cores || [])[(unit.cores?.length || 1) - 1]})`,
                         }}
                       >
                         <Users className="w-6 h-6 text-white" />
@@ -206,11 +265,11 @@ export default function GerenciarUnidadesPage() {
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-muted">
-                            {getGenderLabel(unit.genero)}
+                            {getGenderLabel(unit.genero || 'M')}
                           </span>
                           <span className="text-xs text-muted">•</span>
                           <span className="text-xs text-muted">
-                            {unit.membrosCount} membro{unit.membrosCount !== 1 ? 's' : ''}
+                            {unit.membrosCount || 0} membro{(unit.membrosCount || 0) !== 1 ? 's' : ''}
                           </span>
                         </div>
                       </div>
@@ -261,9 +320,9 @@ export default function GerenciarUnidadesPage() {
                       <div
                         className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 opacity-50"
                         style={{
-                          background: unit.cores.length === 1
-                            ? unit.cores[0]
-                            : `linear-gradient(135deg, ${unit.cores[0]}, ${unit.cores[unit.cores.length - 1]})`,
+                          background: (unit.cores?.length || 0) === 1
+                            ? unit.cores?.[0]
+                            : `linear-gradient(135deg, ${(unit.cores || [])[0]}, ${(unit.cores || [])[(unit.cores?.length || 1) - 1]})`,
                         }}
                       >
                         <Users className="w-6 h-6 text-white" />
@@ -275,11 +334,11 @@ export default function GerenciarUnidadesPage() {
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-xs text-muted">
-                            {getGenderLabel(unit.genero)}
+                            {getGenderLabel(unit.genero || 'M')}
                           </span>
                           <span className="text-xs text-muted">•</span>
                           <span className="text-xs text-muted">
-                            {unit.membrosCount} membro{unit.membrosCount !== 1 ? 's' : ''}
+                            {unit.membrosCount || 0} membro{(unit.membrosCount || 0) !== 1 ? 's' : ''}
                           </span>
                         </div>
                       </div>
@@ -316,16 +375,12 @@ export default function GerenciarUnidadesPage() {
 
         {/* Empty State */}
         {units.length === 0 && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 rounded-full bg-surface flex items-center justify-center mx-auto mb-4">
-              <Users className="w-8 h-8 text-muted" />
-            </div>
-            <h3 className="text-lg font-medium text-text-primary mb-2">Nenhuma unidade encontrada</h3>
-            <p className="text-sm text-muted mb-4">Crie sua primeira unidade para começar</p>
-            <AppButton onClick={openCreateModal} leftIcon={<Plus className="w-5 h-5" />}>
-              Nova Unidade
-            </AppButton>
-          </div>
+          <AppEmptyState
+            icon={<Users className="w-8 h-8 text-primary" />}
+            title="Nenhuma unidade encontrada"
+            description="Crie sua primeira unidade para começar"
+            action={{ label: 'Nova Unidade', onClick: openCreateModal }}
+          />
         )}
       </div>
 
@@ -355,7 +410,7 @@ export default function GerenciarUnidadesPage() {
                 <button
                   key={g.value}
                   type="button"
-                  onClick={() => setFormData({ ...formData, genero: g.value as Unit['genero'] })}
+                  onClick={() => setFormData({ ...formData, genero: g.value as 'M' | 'F'  })}
                   className={cn(
                     'px-4 py-2 rounded-lg text-sm font-medium transition-all',
                     formData.genero === g.value

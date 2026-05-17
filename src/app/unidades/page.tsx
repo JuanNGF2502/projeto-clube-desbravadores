@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Users, Search, Image, Mic, Settings } from 'lucide-react';
+import { Users, Search, Image, Mic, Settings, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -16,39 +16,14 @@ import { ColorPicker } from '@/components/ui/ColorPicker';
 import { useToast } from '@/components/ui/Toast';
 import { Unit, UNIT_GENDERS, DEFAULT_UNIT_COLORS } from '@/types';
 import { cn } from '@/utils/cn';
+import { getUnidadesByClube, createUnidade, updateUnidade, getRankingUnidades } from '@/lib/queries';
 
-const initialUnits: Unit[] = [
-  {
-    id: '1',
-    nome: 'Lobos',
-    genero: 'M',
-    cores: ['#3B82F6', '#1E40AF', '#1E3A8A'],
-    gritoDeGuerra: 'Lobos juntos, jamais vencidos!',
-    significadoLogo: 'O lobo representa a força, lealdade e trabalho em equipe.',
-    historiaNome: 'Escolhido por representar a união e coragem do grupo.',
-    membrosCount: 12,
-    ativo: true,
-    clubeId: '1',
-    createdAt: new Date(),
-  },
-  {
-    id: '2',
-    nome: 'Águias',
-    genero: 'M',
-    cores: ['#C6A15B', '#A16207', '#854D0E'],
-    gritoDeGuerra: 'Voamos alto, servimos sempre!',
-    significadoLogo: 'A águia simboliza visão, proteção e elevação espiritual.',
-    historiaNome: 'Nome inspirado na nobreza e liberdade.',
-    membrosCount: 10,
-    ativo: true,
-    clubeId: '1',
-    createdAt: new Date(),
-  },
-];
+// ID fixo para desenvolvimento - em produção viria do auth
+const CLUB_ID = '00000000-0000-0000-0000-000000000001';
 
 interface FormData {
   nome: string;
-  genero: 'M' | 'F' | 'MISTA';
+  genero: 'M' | 'F' ;
   cores: string[];
   gritoDeGuerra: string;
   logo: string;
@@ -56,14 +31,9 @@ interface FormData {
   historiaNome: string;
 }
 
-// Mock scores for units
-const unitScores: Record<string, number> = {
-  '1': 850,
-  '2': 720,
-};
-
 export default function UnitsPage() {
-  const [units, setUnits] = useState<Unit[]>(initialUnits);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
@@ -79,11 +49,50 @@ export default function UnitsPage() {
   const { addToast } = useToast();
   const router = useRouter();
 
-  const filteredUnits = units.filter((unit) =>
-    unit.nome.toLowerCase().includes(search.toLowerCase())
-  );
+  const carregarDados = async () => {
+    try {
+      setIsLoading(true);
+      const dados = await getUnidadesByClube(CLUB_ID);
+      setUnits(dados || []);
+    } catch (error) {
+      console.error('Erro ao carregar unidades:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar unidades' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const handleSave = () => {
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  // Buscar ranking de pontos por unidade
+  const [rankingData, setRankingData] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const buscarRanking = async () => {
+      try {
+        const ranking = await getRankingUnidades(CLUB_ID);
+        const rankingObj = ranking.reduce((acc, r) => {
+          acc[r.id] = r.totalPontos;
+          return acc;
+        }, {} as Record<string, number>);
+        setRankingData(rankingObj);
+      } catch (error) {
+        console.error('Erro ao buscar ranking:', error);
+      }
+    };
+    buscarRanking();
+  }, []);
+
+  const filteredUnits = useMemo(() => {
+    if (!search) return units;
+    return units.filter((unit) =>
+      unit.nome.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [units, search]);
+
+  const handleSave = async () => {
     if (!formData.nome.trim()) {
       addToast({ type: 'error', title: 'Erro', message: 'Nome é obrigatório' });
       return;
@@ -94,46 +103,39 @@ export default function UnitsPage() {
       return;
     }
 
-    if (editingUnit) {
-      setUnits(
-        units.map((u) =>
-          u.id === editingUnit.id
-            ? {
-                ...u,
-                nome: formData.nome,
-                genero: formData.genero as Unit['genero'],
-                cores: formData.cores,
-                gritoDeGuerra: formData.gritoDeGuerra,
-                logo: formData.logo,
-                significadoLogo: formData.significadoLogo,
-                historiaNome: formData.historiaNome,
-              }
-            : u
-        )
-      );
-      addToast({ type: 'success', title: 'Unidade atualizada', message: `${formData.nome} foi atualizada com sucesso` });
-    } else {
-      const newUnit: Unit = {
-        id: String(Date.now()),
-        nome: formData.nome,
-        genero: formData.genero as Unit['genero'],
-        cores: formData.cores,
-        gritoDeGuerra: formData.gritoDeGuerra,
-        logo: formData.logo,
-        significadoLogo: formData.significadoLogo,
-        historiaNome: formData.historiaNome,
-        ativo: true,
-        clubeId: '1',
-        membrosCount: 0,
-        createdAt: new Date(),
-      };
-      setUnits([...units, newUnit]);
-      addToast({ type: 'success', title: 'Unidade criada', message: `${formData.nome} foi criada com sucesso` });
-    }
+    try {
+      if (editingUnit) {
+        await updateUnidade(editingUnit.id, {
+          nome: formData.nome,
+          genero: formData.genero as 'M' | 'F' ,
+          cores: formData.cores,
+          clube_id: CLUB_ID,
+          grito_de_guerra: formData.gritoDeGuerra || undefined,
+          significado_logo: formData.significadoLogo || undefined,
+          historia_nome: formData.historiaNome || undefined,
+        });
+        addToast({ type: 'success', title: 'Sucesso', message: `${formData.nome} foi atualizada com sucesso` });
+      } else {
+        await createUnidade({
+          nome: formData.nome,
+          genero: formData.genero as 'M' | 'F' ,
+          cores: formData.cores,
+          clube_id: CLUB_ID,
+          grito_de_guerra: formData.gritoDeGuerra || undefined,
+          significado_logo: formData.significadoLogo || undefined,
+          historia_nome: formData.historiaNome || undefined,
+        });
+        addToast({ type: 'success', title: 'Sucesso', message: `${formData.nome} foi criada com sucesso` });
+      }
 
-    setIsModalOpen(false);
-    setEditingUnit(null);
-    resetForm();
+      setIsModalOpen(false);
+      setEditingUnit(null);
+      resetForm();
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao salvar unidade:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar unidade' });
+    }
   };
 
   const resetForm = () => {
@@ -152,8 +154,8 @@ export default function UnitsPage() {
     setEditingUnit(unit);
     setFormData({
       nome: unit.nome,
-      genero: unit.genero,
-      cores: [...unit.cores],
+      genero: unit.genero as 'M' | 'F' ,
+      cores: [...(unit.cores || [])],
       gritoDeGuerra: unit.gritoDeGuerra || '',
       logo: unit.logo || '',
       significadoLogo: unit.significadoLogo || '',
@@ -162,8 +164,33 @@ export default function UnitsPage() {
     setIsModalOpen(true);
   };
 
+  const openCreateModal = () => {
+    setEditingUnit(null);
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout title="Unidades" subtitle="Carregando...">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
-    <AppLayout title="Unidades" subtitle={`${units.length} unidades cadastradas`}>
+    <AppLayout
+      title="Unidades"
+      subtitle={`${units.length} unidades cadastradas`}
+      actions={
+        <AppButton variant="primary" size="sm" onClick={openCreateModal}>
+          <Users className="w-4 h-4 mr-1" />
+          Nova
+        </AppButton>
+      }
+    >
       <div className="flex gap-2 mb-4">
         <AppInput
           placeholder="Buscar unidade..."
@@ -186,7 +213,8 @@ export default function UnitsPage() {
         <AppEmptyState
           icon={<Users className="w-8 h-8 text-primary" />}
           title="Nenhuma unidade encontrada"
-          description="Gerencie suas unidades pelo perfil"
+          description={search ? 'Tente buscar por outro nome.' : 'Crie sua primeira unidade para começar.'}
+          action={!search ? { label: 'Nova Unidade', onClick: openCreateModal } : undefined}
         />
       ) : (
         <div className="grid gap-3">
@@ -208,42 +236,42 @@ export default function UnitsPage() {
                   <div
                     className="h-1.5 -mx-6 -mt-6 mb-4"
                     style={{
-                      background: unit.cores.length === 1
-                        ? unit.cores[0]
-                        : `linear-gradient(to right, ${unit.cores.join(', ')})`,
+                      background: (unit.cores?.length || 0) === 1
+                        ? unit.cores?.[0]
+                        : `linear-gradient(to right, ${(unit.cores || []).join(', ')})`,
                     }}
                   />
                   <div className="flex items-center gap-4">
                     <div
                       className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                       style={{
-                        background: unit.cores.length === 1
-                          ? unit.cores[0]
-                          : `linear-gradient(135deg, ${unit.cores[0]}, ${unit.cores[unit.cores.length - 1]})`,
+                        background: (unit.cores?.length || 0) === 1
+                          ? unit.cores?.[0]
+                          : `linear-gradient(135deg, ${(unit.cores || [])[0]}, ${(unit.cores || [])[(unit.cores?.length || 1) - 1]})`,
                       }}
                     >
                       <Users className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold" style={{ color: 'var(--text-color)' }}>{unit.nome}</h3>
+                        <h3 className="font-semibold text-text-primary">{unit.nome}</h3>
                         <AppBadge
-                          variant={unit.genero === 'M' ? 'info' : unit.genero === 'F' ? 'danger' : 'success'}
+                          variant={unit.genero === 'M' ? 'info' : 'danger'}
                           size="sm"
                         >
-                          {unit.genero === 'M' ? 'Masculina' : unit.genero === 'F' ? 'Feminina' : 'Mista'}
+                          {unit.genero === 'M' ? 'Masculina' : 'Feminina'}
                         </AppBadge>
                       </div>
-                      <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>
-                        {unit.membrosCount} membros
+                      <p className="text-sm text-muted">
+                        {unit.membrosCount || 0} membros
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-lg font-bold text-primary">{unitScores[unit.id] || 0}</p>
-                        <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>pontos</p>
+                        <p className="text-lg font-bold text-primary">{rankingData[unit.id] || 0}</p>
+                        <p className="text-xs text-muted">pontos</p>
                       </div>
-                      <svg className="w-5 h-5" style={{ color: 'var(--text-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
@@ -255,7 +283,7 @@ export default function UnitsPage() {
         </div>
       )}
 
-      {/* Create/Edit Modal - triggered from profile */}
+      {/* Create/Edit Modal */}
       <AppModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -277,24 +305,19 @@ export default function UnitsPage() {
 
           {/* Gênero */}
           <div>
-            <label className="text-sm font-medium ml-1 block mb-2" style={{ color: 'var(--text-secondary-color)' }}>Gênero</label>
+            <label className="text-sm font-medium ml-1 block mb-2 text-text-secondary">Gênero</label>
             <div className="flex gap-2">
               {UNIT_GENDERS.map((g) => (
                 <button
                   key={g.value}
                   type="button"
-                  onClick={() => setFormData({ ...formData, genero: g.value as Unit['genero'] })}
+                  onClick={() => setFormData({ ...formData, genero: g.value as 'M' | 'F' })}
                   className={cn(
                     'flex-1 py-2.5 rounded-xl text-sm font-medium transition-all',
                     formData.genero === g.value
                       ? 'bg-primary text-background'
-                      : 'border transition-colors'
+                      : 'border bg-card text-text-secondary'
                   )}
-                  style={{
-                    backgroundColor: formData.genero === g.value ? undefined : 'var(--card-color)',
-                    borderColor: formData.genero === g.value ? undefined : 'var(--border-color)',
-                    color: formData.genero === g.value ? undefined : 'var(--text-secondary-color)',
-                  }}
                 >
                   {g.label}
                 </button>
@@ -304,7 +327,7 @@ export default function UnitsPage() {
 
           {/* Color Picker */}
           <div>
-            <label className="text-sm font-medium ml-1 block mb-2" style={{ color: 'var(--text-secondary-color)' }}>
+            <label className="text-sm font-medium ml-1 block mb-2 text-text-secondary">
               Cores da Unidade
             </label>
             <ColorPicker
@@ -322,39 +345,6 @@ export default function UnitsPage() {
             onChange={(e) => setFormData({ ...formData, gritoDeGuerra: e.target.value })}
             leftIcon={<Mic className="w-4 h-4" />}
           />
-
-          {/* Logo da Unidade */}
-          <div>
-            <label className="text-sm font-medium ml-1 block mb-2" style={{ color: 'var(--text-secondary-color)' }}>
-              Logo da Unidade
-            </label>
-            <div
-              className="border-2 border-dashed rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
-              style={{ borderColor: 'var(--border-color)' }}
-              onClick={() => addToast({ type: 'info', title: 'Em breve', message: 'Upload de imagem será implementado' })}
-            >
-              {formData.cores.length > 0 ? (
-                <div className="relative">
-                  <div
-                    className="w-20 h-20 mx-auto rounded-xl flex items-center justify-center"
-                    style={{
-                      background: formData.cores.length === 1
-                        ? formData.cores[0]
-                        : `linear-gradient(135deg, ${formData.cores[0]}, ${formData.cores[formData.cores.length - 1]})`,
-                    }}
-                  >
-                    <Image className="w-8 h-8 text-white/50" />
-                  </div>
-                  <p className="text-sm mt-2" style={{ color: 'var(--text-secondary-color)' }}>Clique para adicionar logo</p>
-                </div>
-              ) : (
-                <>
-                  <Image className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-secondary-color)' }} />
-                  <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Selecione as cores primeiro</p>
-                </>
-              )}
-            </div>
-          </div>
 
           {/* Significado do Logo */}
           <AppTextarea

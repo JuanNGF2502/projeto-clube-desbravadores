@@ -314,7 +314,7 @@ export const DEFAULT_CLASSES: Classe[] = [
   {
     id: '1',
     nome: 'Amigo',
-    descricao: 'Primeira classe para iniciantes',
+    descricao: '',
     ordem: 1,
     cor: '#3B82F6', // Azul
     classesPreRequisito: [],
@@ -323,7 +323,7 @@ export const DEFAULT_CLASSES: Classe[] = [
   {
     id: '2',
     nome: 'Companheiro',
-    descricao: 'Segunda classe',
+    descricao: '',
     ordem: 2,
     cor: '#EF4444', // Vermelho
     classesPreRequisito: ['1'],
@@ -332,7 +332,7 @@ export const DEFAULT_CLASSES: Classe[] = [
   {
     id: '3',
     nome: 'Pesquisador',
-    descricao: 'Terceira classe',
+    descricao: '',
     ordem: 3,
     cor: '#22C55E', // Verde
     classesPreRequisito: ['2'],
@@ -341,7 +341,7 @@ export const DEFAULT_CLASSES: Classe[] = [
   {
     id: '4',
     nome: 'Pioneiro',
-    descricao: 'Quarta classe',
+    descricao: '',
     ordem: 4,
     cor: '#71717A', // Cinza
     classesPreRequisito: ['3'],
@@ -350,7 +350,7 @@ export const DEFAULT_CLASSES: Classe[] = [
   {
     id: '5',
     nome: 'Excursionista',
-    descricao: 'Quinta classe',
+    descricao: '',
     ordem: 5,
     cor: '#8B5CF6', // Roxo
     classesPreRequisito: ['4'],
@@ -359,7 +359,7 @@ export const DEFAULT_CLASSES: Classe[] = [
   {
     id: '6',
     nome: 'Guia',
-    descricao: 'Classe máxima',
+    descricao: '',
     ordem: 6,
     cor: '#EAB308', // Amarelo
     classesPreRequisito: ['5'],
@@ -506,7 +506,7 @@ export interface Club {
 export interface Unit {
   id: string;
   nome: string;
-  genero: 'M' | 'F' | 'MISTA';
+  genero: 'M' | 'F';
   cores: string[];
   gritoDeGuerra?: string;
   logo?: string;
@@ -685,5 +685,4 @@ export const DEFAULT_UNIT_COLORS = ['#3B82F6', '#1E40AF', '#1E3A8A'];
 export const UNIT_GENDERS = [
   { value: 'M', label: 'Masculina' },
   { value: 'F', label: 'Feminina' },
-  { value: 'MISTA', label: 'Mista' },
 ];
