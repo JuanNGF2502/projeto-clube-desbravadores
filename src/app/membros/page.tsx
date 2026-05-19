@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   Plus,
@@ -8,195 +8,104 @@ import {
   Filter,
   User,
   Shield,
-  BookOpen,
-  Calendar,
-  MoreVertical,
-  Edit,
-  Trash2,
-  History,
+  Loader2,
+  UserMinus,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { MembroFormModal, MembroCard } from '@/components/membros';
+import { MembroFormModal, MembroCard, MembroDetailModal, MembroInativoModal } from '@/components/membros';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
 import { AppCard } from '@/components/ui/AppCard';
-import { AppBadge } from '@/components/ui/AppBadge';
 import { AppEmptyState } from '@/components/ui/AppEmptyState';
-import { cn } from '@/utils/cn';
-import {
-  Usuario,
-  Unit,
-  CargoTipo,
-  getClasseAtualPrincipal,
-  CARGOS,
-  getCargoByTipo,
-  DEFAULT_CLASSES,
-} from '@/types';
+import { useToast } from '@/components/ui/Toast';
+import { getMembros, getUnidades, createMembro, updateMembro, deleteMembro, createMembroCargo, createMembroClasseAtual, createMembroUnidade, deleteMembroCargos, deleteMembroClassesAtuais, getClasses, getCargos } from '@/lib/queries';
+import { Unit, CargoTipo, DEFAULT_CLASSES } from '@/types';
 
-// Mock data - em produção viria da API
-const mockUnidades: Unit[] = [
-  {
-    id: '1',
-    nome: 'Lobos',
-    genero: 'M',
-    cores: ['#3B82F6', '#1E40AF', '#1E3A8A'],
-    ativo: true,
-    clubeId: '1',
-    createdAt: new Date(),
-  },
-  {
-    id: '2',
-    nome: 'Águias',
-    genero: 'F',
-    cores: ['#EC4899', '#BE185D', '#9D174D'],
-    ativo: true,
-    clubeId: '1',
-    createdAt: new Date(),
-  },
-  {
-    id: '3',
-    nome: 'Fênix',
-    genero: 'MISTA',
-    cores: ['#F97316', '#EA580C', '#C2410C'],
-    ativo: true,
-    clubeId: '1',
-    createdAt: new Date(),
-  },
-];
-
-const mockMembros: Usuario[] = [
-  {
-    id: '1',
-    nome: 'Lucas Silva',
-    sexo: 'M',
-    dataNascimento: new Date('2012-03-15'),
-    telefone: '(11) 99999-1111',
-    email: 'lucas@email.com',
-    ativo: true,
-    clubeId: '1',
-    dataCadastro: new Date('2022-01-15'),
-    classesAtuais: [{ classeId: '5', dataInicio: new Date('2025-01-15') }],
-    classesConcluidas: [
-      { classeId: '1', dataInicio: new Date('2022-01-15'), dataConclusao: new Date('2022-03-20'), concluido: true },
-      { classeId: '2', dataInicio: new Date('2022-03-21'), dataConclusao: new Date('2022-06-15'), concluido: true },
-      { classeId: '3', dataInicio: new Date('2022-06-16'), dataConclusao: new Date('2022-09-10'), concluido: true },
-      { classeId: '4', dataInicio: new Date('2022-09-11'), dataConclusao: new Date('2023-01-20'), concluido: true },
-    ],
-    cargos: [
-      { tipo: 'CAPITAO', dataAtribuicao: new Date('2024-01-01'), unidadeId: '1', ativo: true },
-    ],
-    unidadeAtualId: '1',
-    unidadesAnteriores: [],
-    especialidadesConcluidas: [],
-    transicoes: [],
-  },
-  {
-    id: '2',
-    nome: 'Ana Costa',
-    sexo: 'F',
-    dataNascimento: new Date('2013-07-22'),
-    telefone: '(11) 99999-2222',
-    email: 'ana@email.com',
-    ativo: true,
-    clubeId: '1',
-    dataCadastro: new Date('2021-06-01'),
-    classesAtuais: [{ classeId: '6', dataInicio: new Date('2024-11-01') }],
-    classesConcluidas: [
-      { classeId: '1', dataInicio: new Date('2021-06-01'), dataConclusao: new Date('2021-08-15'), concluido: true },
-      { classeId: '2', dataInicio: new Date('2021-08-16'), dataConclusao: new Date('2021-11-20'), concluido: true },
-      { classeId: '3', dataInicio: new Date('2021-11-21'), dataConclusao: new Date('2022-02-28'), concluido: true },
-      { classeId: '4', dataInicio: new Date('2022-03-01'), dataConclusao: new Date('2022-06-15'), concluido: true },
-      { classeId: '5', dataInicio: new Date('2022-06-16'), dataConclusao: new Date('2022-10-30'), concluido: true },
-    ],
-    cargos: [
-      { tipo: 'CONSELHEIRO', dataAtribuicao: new Date('2024-01-01'), unidadeId: '1', ativo: true },
-    ],
-    unidadeAtualId: '1',
-    unidadesAnteriores: [],
-    especialidadesConcluidas: ['especialidade_1', 'especialidade_2'],
-    transicoes: [],
-  },
-  {
-    id: '3',
-    nome: 'Pedro Santos',
-    sexo: 'M',
-    dataNascimento: new Date('2014-01-10'),
-    ativo: true,
-    clubeId: '1',
-    dataCadastro: new Date('2023-03-10'),
-    classesAtuais: [{ classeId: '4', dataInicio: new Date('2025-01-15') }],
-    classesConcluidas: [
-      { classeId: '1', dataInicio: new Date('2023-03-10'), dataConclusao: new Date('2023-05-20'), concluido: true },
-      { classeId: '2', dataInicio: new Date('2023-05-21'), dataConclusao: new Date('2023-08-15'), concluido: true },
-      { classeId: '3', dataInicio: new Date('2023-08-16'), dataConclusao: new Date('2024-01-10'), concluido: true },
-    ],
-    cargos: [
-      { tipo: 'SECRETARIO', dataAtribuicao: new Date('2024-01-01'), unidadeId: '1', ativo: true },
-      { tipo: 'DESBRAVADOR', dataAtribuicao: new Date('2023-03-10'), unidadeId: '1', ativo: true },
-    ],
-    unidadeAtualId: '1',
-    unidadesAnteriores: [],
-    especialidadesConcluidas: [],
-    transicoes: [],
-  },
-  {
-    id: '4',
-    nome: 'Maria Oliveira',
-    sexo: 'F',
-    dataNascimento: new Date('2015-09-05'),
-    ativo: true,
-    clubeId: '1',
-    dataCadastro: new Date('2024-02-01'),
-    classesAtuais: [{ classeId: '1', dataInicio: new Date('2024-02-01') }],
-    classesConcluidas: [],
-    cargos: [
-      { tipo: 'DESBRAVADOR', dataAtribuicao: new Date('2024-02-01'), unidadeId: '2', ativo: true },
-    ],
-    unidadeAtualId: '2',
-    unidadesAnteriores: [],
-    especialidadesConcluidas: [],
-    transicoes: [],
-  },
-  {
-    id: '5',
-    nome: 'João Ferreira',
-    sexo: 'M',
-    dataNascimento: new Date('2011-11-30'),
-    ativo: false,
-    clubeId: '1',
-    dataCadastro: new Date('2020-01-15'),
-    dataDesligamento: new Date('2024-12-01'),
-    motivoDesligamento: 'Transferência',
-    classesAtuais: [],
-    classesConcluidas: [
-      { classeId: '1', dataInicio: new Date('2020-01-15'), dataConclusao: new Date('2020-03-20'), concluido: true },
-      { classeId: '2', dataInicio: new Date('2020-03-21'), dataConclusao: new Date('2020-06-15'), concluido: true },
-      { classeId: '3', dataInicio: new Date('2020-06-16'), dataConclusao: new Date('2020-09-10'), concluido: true },
-    ],
-    cargos: [
-      { tipo: 'DESBRAVADOR', dataAtribuicao: new Date('2020-01-15'), ativo: false },
-    ],
-    unidadeAtualId: undefined,
-    unidadesAnteriores: [{ unidadeId: '1', dataEntrada: new Date('2020-01-15'), dataSaida: new Date('2024-12-01') }],
-    especialidadesConcluidas: [],
-    transicoes: [],
-  },
-];
-
-type FiltroCargo = CargoTipo | 'TODOS';
-type FiltroStatus = 'TODOS' | 'ATIVOS' | 'INATIVOS';
-type FiltroClasse = string | 'TODOS';
+interface MembroData {
+  id: string;
+  nome: string;
+  nome_social?: string;
+  sexo: string;
+  data_nascimento: string;
+  data_cadastro?: string;
+  data_desligamento?: string;
+  telefone?: string;
+  email?: string;
+  foto?: string;
+  ativo: boolean;
+  unidade_id?: string;
+  observacoes?: string;
+  motivo_desligamento?: string;
+  endereco?: any;
+  responsavel?: any;
+  unidade?: {
+    nome: string;
+    cores: string[];
+    genero: string;
+  };
+  membros_cargos?: {
+    cargo_tipo: string;
+    cargo?: {
+      nome: string;
+      cor: string;
+    };
+    ativo: boolean;
+    data_atribuicao?: string;
+    unidade_id?: string;
+    observacao?: string;
+  }[];
+  membros_classes_atuais?: {
+    classe_id: string;
+    classe?: {
+      nome: string;
+      cor: string;
+    };
+    data_inicio?: string;
+  }[];
+}
 
 export default function MembrosPage() {
-  const [membros, setMembros] = useState<Usuario[]>(mockMembros);
+  const [membros, setMembros] = useState<MembroData[]>([]);
+  const [unidades, setUnidades] = useState<Unit[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filtroCargo, setFiltroCargo] = useState<FiltroCargo>('TODOS');
-  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('ATIVOS');
-  const [filtroClasse, setFiltroClasse] = useState<FiltroClasse>('TODOS');
+  const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'ATIVOS' | 'INATIVOS'>('ATIVOS');
   const [filtroUnidade, setFiltroUnidade] = useState<string>('TODOS');
   const [showForm, setShowForm] = useState(false);
-  const [editandoMembro, setEditandoMembro] = useState<Usuario | null>(null);
+  const [editandoMembro, setEditandoMembro] = useState<MembroData | null>(null);
   const [showFiltros, setShowFiltros] = useState(false);
+  const [membroSelecionado, setMembroSelecionado] = useState<any | null>(null);
+  const [showInativos, setShowInativos] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const { addToast } = useToast();
+
+  // ID fixo para desenvolvimento - em produção viria do auth
+  const CLUB_ID = '00000000-0000-0000-0000-000000000001';
+
+  const carregarDados = async () => {
+    try {
+      setIsLoading(true);
+      const [membrosData, unidadesData] = await Promise.all([
+        getMembros(CLUB_ID),
+        getUnidades(CLUB_ID),
+      ]);
+      setMembros(membrosData || []);
+      setUnidades(unidadesData || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar dados:', error?.message || error);
+      addToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Falha ao carregar dados',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
 
   const membrosFiltrados = useMemo(() => {
     return membros.filter((membro) => {
@@ -209,61 +118,118 @@ export default function MembrosPage() {
       if (filtroStatus === 'ATIVOS' && !membro.ativo) return false;
       if (filtroStatus === 'INATIVOS' && membro.ativo) return false;
 
-      // Cargo
-      if (filtroCargo !== 'TODOS') {
-        if (!membro.cargos.some(c => c.tipo === filtroCargo && c.ativo)) {
-          return false;
-        }
-      }
-
-      // Classe
-      if (filtroClasse !== 'TODOS' && getClasseAtualPrincipal(membro) !== filtroClasse) {
-        return false;
-      }
-
       // Unidade
-      if (filtroUnidade !== 'TODOS' && membro.unidadeAtualId !== filtroUnidade) {
+      if (filtroUnidade !== 'TODOS' && membro.unidade_id !== filtroUnidade) {
         return false;
       }
 
       return true;
     });
-  }, [membros, search, filtroCargo, filtroStatus, filtroClasse, filtroUnidade]);
+  }, [membros, search, filtroStatus, filtroUnidade]);
 
   const estatisticas = useMemo(() => ({
     total: membros.length,
     ativos: membros.filter(m => m.ativo).length,
     inativos: membros.filter(m => !m.ativo).length,
-    porCargo: CARGOS.reduce((acc, cargo) => {
-      acc[cargo.tipo] = membros.filter(m =>
-        m.ativo && m.cargos.some(c => c.tipo === cargo.tipo && c.ativo)
-      ).length;
-      return acc;
-    }, {} as Record<CargoTipo, number>),
-    porClasse: DEFAULT_CLASSES.reduce((acc, classe) => {
-      acc[classe.id] = membros.filter(m => getClasseAtualPrincipal(m) === classe.id && m.ativo).length;
-      return acc;
-    }, {} as Record<string, number>),
   }), [membros]);
 
+  const membrosInativos = useMemo(() => {
+    return membros.filter(m => !m.ativo);
+  }, [membros]);
+
   const unidadesCores = useMemo(() => {
-    return mockUnidades.reduce((acc, u) => {
+    return unidades.reduce((acc, u) => {
       acc[u.id] = u.cores;
       return acc;
     }, {} as Record<string, string[]>);
-  }, []);
+  }, [unidades]);
 
-  const handleSalvarMembro = (dados: Partial<Usuario>) => {
-    if (editandoMembro) {
-      setMembros(prev => prev.map(m => m.id === dados.id ? { ...m, ...dados } as Usuario : m));
-    } else {
-      setMembros(prev => [...prev, dados as Usuario]);
+  const handleSalvarMembro = async (dados: any) => {
+    try {
+      setIsSaving(true);
+      // Extrair apenas os campos que existem na tabela membros
+      const membroData = {
+        nome: dados.nome,
+        nome_social: dados.nomeSocial || null,
+        sexo: dados.sexo,
+        data_nascimento: dados.dataNascimento instanceof Date
+          ? dados.dataNascimento.toISOString().split('T')[0]
+          : dados.dataNascimento,
+        telefone: dados.telefone || null,
+        email: dados.email || null,
+        foto: dados.foto || null,
+        ativo: dados.ativo !== undefined ? dados.ativo : true,
+        unidade_id: dados.unidadeAtualId || dados.unidadeId || null,
+      };
+
+      if (editandoMembro) {
+        await updateMembro(editandoMembro.id, membroData);
+
+        const unidadeId = dados.unidadeAtualId || dados.unidadeId || null;
+
+        // Atualizar cargos (delete + insert)
+        await deleteMembroCargos(editandoMembro.id);
+        if (dados.cargos && dados.cargos.length > 0) {
+          for (const cargo of dados.cargos) {
+            const cargoTipo = typeof cargo === 'string' ? cargo : cargo.tipo;
+            await createMembroCargo(editandoMembro.id, cargoTipo, unidadeId);
+          }
+        }
+
+        // Atualizar classes atuais (delete + insert)
+        await deleteMembroClassesAtuais(editandoMembro.id);
+        if (dados.classesAtuais && dados.classesAtuais.length > 0) {
+          for (const classe of dados.classesAtuais) {
+            const classeId = typeof classe === 'string' ? classe : classe.classeId;
+            await createMembroClasseAtual(editandoMembro.id, classeId);
+          }
+        }
+
+        addToast({ type: 'success', title: 'Sucesso', message: 'Membro atualizado' });
+      } else {
+        // Criar membro
+        const novoMembro = await createMembro({
+          ...membroData,
+          clube_id: CLUB_ID,
+        });
+
+        const unidadeId = dados.unidadeAtualId || dados.unidadeId || null;
+
+        // Salvar cargos
+        if (dados.cargos && dados.cargos.length > 0) {
+          for (const cargo of dados.cargos) {
+            const cargoTipo = typeof cargo === 'string' ? cargo : cargo.tipo;
+            await createMembroCargo(novoMembro.id, cargoTipo, unidadeId);
+          }
+        }
+
+        // Salvar classes atuais
+        if (dados.classesAtuais && dados.classesAtuais.length > 0) {
+          for (const classe of dados.classesAtuais) {
+            const classeId = typeof classe === 'string' ? classe : classe.classeId;
+            await createMembroClasseAtual(novoMembro.id, classeId);
+          }
+        }
+
+        // Salvar histórico de unidade
+        if (unidadeId) {
+          await createMembroUnidade(novoMembro.id, unidadeId);
+        }
+
+        addToast({ type: 'success', title: 'Sucesso', message: 'Membro criado' });
+      }
+      await carregarDados();
+      setShowForm(false);
+      setEditandoMembro(null);
+    } catch (error) {
+      console.error('Erro ao salvar membro:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar membro' });
+    } finally {
+      setIsSaving(false);
     }
-    setShowForm(false);
-    setEditandoMembro(null);
   };
 
-  const handleEditarMembro = (membro: Usuario) => {
+  const handleEditarMembro = (membro: MembroData) => {
     setEditandoMembro(membro);
     setShowForm(true);
   };
@@ -273,14 +239,99 @@ export default function MembrosPage() {
     setShowForm(true);
   };
 
+  const handleVerDetalhes = (membro: MembroData) => {
+    const membroCompleto = {
+      id: membro.id,
+      nome: membro.nome,
+      nomeSocial: membro.nome_social || undefined,
+      sexo: membro.sexo as 'M' | 'F',
+      dataNascimento: new Date(membro.data_nascimento),
+      telefone: membro.telefone,
+      email: membro.email,
+      foto: membro.foto,
+      ativo: membro.ativo,
+      clubeId: CLUB_ID,
+      dataCadastro: membro.data_cadastro ? new Date(membro.data_cadastro) : new Date(),
+      classesAtuais: membro.membros_classes_atuais?.map(c => ({
+        classeId: String(c.classe_id),
+        dataInicio: c.data_inicio ? new Date(c.data_inicio) : new Date(),
+      })) || [],
+      classesConcluidas: [],
+      cargos: membro.membros_cargos?.map(c => ({
+        tipo: c.cargo_tipo as CargoTipo,
+        dataAtribuicao: c.data_atribuicao ? new Date(c.data_atribuicao) : new Date(),
+        unidadeId: c.unidade_id || membro.unidade_id,
+        ativo: c.ativo,
+        observacao: c.observacao,
+      })) || [],
+      unidadeAtualId: membro.unidade_id,
+      unidadesAnteriores: [],
+      especialidadesConcluidas: [],
+      transicoes: [],
+      responsavel: membro.responsavel,
+      observacoes: membro.observacoes,
+    };
+    setMembroSelecionado(membroCompleto);
+  };
+
+  const handleEditarDeDetalhes = (membroCompleto: any) => {
+    // Find the original membroData from the list
+    const membroData = membros.find(m => m.id === membroCompleto.id);
+    if (membroData) {
+      setEditandoMembro(membroData);
+      setMembroSelecionado(null);
+      setShowForm(true);
+    }
+  };
+
+  const handleAtivarMembro = async (membro: MembroData) => {
+    try {
+      await updateMembro(membro.id, { ativo: true });
+      addToast({
+        type: 'success',
+        title: 'Sucesso',
+        message: `${membro.nome} foi reativado`,
+      });
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao ativar membro:', error);
+      addToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Falha ao ativar membro',
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout title="Membros">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout
       title="Membros"
       actions={
-        <AppButton variant="primary" size="sm" onClick={handleNovoMembro}>
-          <Plus className="w-4 h-4 mr-1" />
-          Novo
-        </AppButton>
+        <div className="flex gap-2">
+          <AppButton
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowInativos(true)}
+            disabled={estatisticas.inativos === 0}
+          >
+            <UserMinus className="w-4 h-4 mr-1" />
+            Inativos ({estatisticas.inativos})
+          </AppButton>
+          <AppButton variant="primary" size="sm" onClick={handleNovoMembro}>
+            <Plus className="w-4 h-4 mr-1" />
+            Novo
+          </AppButton>
+        </div>
       }
     >
       <div className="space-y-4">
@@ -329,38 +380,12 @@ export default function MembrosPage() {
                 <label className="text-xs text-muted mb-1 block">Status</label>
                 <select
                   value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value as FiltroStatus)}
+                  onChange={(e) => setFiltroStatus(e.target.value as any)}
                   className="w-full p-2 rounded-lg border border-border bg-background text-text-primary text-sm"
                 >
                   <option value="TODOS">Todos</option>
                   <option value="ATIVOS">Ativos</option>
                   <option value="INATIVOS">Inativos</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-muted mb-1 block">Cargo</label>
-                <select
-                  value={filtroCargo}
-                  onChange={(e) => setFiltroCargo(e.target.value as FiltroCargo)}
-                  className="w-full p-2 rounded-lg border border-border bg-background text-text-primary text-sm"
-                >
-                  <option value="TODOS">Todos</option>
-                  {CARGOS.map(c => (
-                    <option key={c.tipo} value={c.tipo}>{c.nome}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-muted mb-1 block">Classe</label>
-                <select
-                  value={filtroClasse}
-                  onChange={(e) => setFiltroClasse(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-border bg-background text-text-primary text-sm"
-                >
-                  <option value="TODOS">Todas</option>
-                  {DEFAULT_CLASSES.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
-                  ))}
                 </select>
               </div>
               <div>
@@ -371,7 +396,7 @@ export default function MembrosPage() {
                   className="w-full p-2 rounded-lg border border-border bg-background text-text-primary text-sm"
                 >
                   <option value="TODOS">Todas</option>
-                  {mockUnidades.map(u => (
+                  {unidades.map(u => (
                     <option key={u.id} value={u.id}>{u.nome}</option>
                   ))}
                 </select>
@@ -383,8 +408,6 @@ export default function MembrosPage() {
                 size="sm"
                 onClick={() => {
                   setFiltroStatus('ATIVOS');
-                  setFiltroCargo('TODOS');
-                  setFiltroClasse('TODOS');
                   setFiltroUnidade('TODOS');
                 }}
               >
@@ -408,38 +431,41 @@ export default function MembrosPage() {
               Mostrando {membrosFiltrados.length} de {membros.length} membros
             </p>
             {membrosFiltrados.map((membro) => (
-              <div key={membro.id} className="relative group">
-                <MembroCard
-                  membro={membro}
-                  unidadeCores={unidadesCores[membro.unidadeAtualId || '']}
-                  onClick={() => handleEditarMembro(membro)}
-                />
-                {/* Actions */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                  <AppButton
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEditarMembro(membro);
-                    }}
-                    className="!p-1.5"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </AppButton>
-                  <AppButton
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // TODO: Ver histórico
-                    }}
-                    className="!p-1.5"
-                  >
-                    <History className="w-4 h-4" />
-                  </AppButton>
-                </div>
-              </div>
+              <MembroCard
+                key={membro.id}
+                membro={{
+                  id: membro.id,
+                  nome: membro.nome,
+                  sexo: membro.sexo as 'M' | 'F',
+                  dataNascimento: new Date(membro.data_nascimento),
+                  telefone: membro.telefone,
+                  email: membro.email,
+                  foto: membro.foto,
+                  ativo: membro.ativo,
+                  clubeId: CLUB_ID,
+                  dataCadastro: membro.data_cadastro ? new Date(membro.data_cadastro) : new Date(),
+                  classesAtuais: membro.membros_classes_atuais?.map(c => ({
+                    classeId: String(c.classe_id),
+                    dataInicio: c.data_inicio ? new Date(c.data_inicio) : new Date(),
+                  })) || [],
+                  classesConcluidas: [],
+                  cargos: membro.membros_cargos?.filter(c => c.ativo).map(c => ({
+                    tipo: c.cargo_tipo as CargoTipo,
+                    dataAtribuicao: c.data_atribuicao ? new Date(c.data_atribuicao) : new Date(),
+                    unidadeId: c.unidade_id || membro.unidade_id,
+                    ativo: c.ativo,
+                    observacao: c.observacao,
+                  })) || [],
+                  unidadeAtualId: membro.unidade_id,
+                  unidadesAnteriores: [],
+                  especialidadesConcluidas: [],
+                  transicoes: [],
+                  responsavel: membro.responsavel,
+                  observacoes: membro.observacoes,
+                } as any}
+                unidadeCores={unidadesCores[membro.unidade_id || '']}
+                onClick={() => handleVerDetalhes(membro)}
+              />
             ))}
           </div>
         )}
@@ -453,8 +479,76 @@ export default function MembrosPage() {
           setEditandoMembro(null);
         }}
         onSave={handleSalvarMembro}
-        usuario={editandoMembro}
-        unidades={mockUnidades}
+        usuario={editandoMembro ? {
+          id: editandoMembro.id,
+          nome: editandoMembro.nome,
+          nomeSocial: editandoMembro.nome_social || undefined,
+          sexo: editandoMembro.sexo as 'M' | 'F',
+          dataNascimento: editandoMembro.data_nascimento ? new Date(editandoMembro.data_nascimento) : new Date(),
+          telefone: editandoMembro.telefone || undefined,
+          email: editandoMembro.email || undefined,
+          foto: editandoMembro.foto || undefined,
+          ativo: editandoMembro.ativo,
+          clubeId: CLUB_ID,
+          dataCadastro: new Date(editandoMembro.data_cadastro || new Date()),
+          dataDesligamento: editandoMembro.data_desligamento ? new Date(editandoMembro.data_desligamento) : undefined,
+          motivoDesligamento: editandoMembro.motivo_desligamento || undefined,
+          // Classes atuais - mapeando do banco
+          classesAtuais: editandoMembro.membros_classes_atuais?.map(c => ({
+            classeId: c.classe_id,
+            dataInicio: c.data_inicio ? new Date(c.data_inicio) : new Date(),
+            classe: c.classe,
+          })) || [],
+          // Classes concluídas - pode buscar do banco se necessário
+          classesConcluidas: [],
+          // Cargos - mapeando do banco com verificação de ativo
+          cargos: editandoMembro.membros_cargos?.map(c => ({
+            tipo: c.cargo_tipo as CargoTipo,
+            dataAtribuicao: c.data_atribuicao ? new Date(c.data_atribuicao) : new Date(),
+            unidadeId: c.unidade_id || undefined,
+            ativo: c.ativo !== false,
+            observacao: c.observacao || undefined,
+          })) || [],
+          // Unidade atual
+          unidadeAtualId: editandoMembro.unidade_id || undefined,
+          // Arrays vazios para dados não carregados
+          unidadesAnteriores: [],
+          especialidadesConcluidas: [],
+          transicoes: [],
+          // Endereço e responsáveis
+          endereco: editandoMembro.endereco || undefined,
+          responsavel: editandoMembro.responsavel || undefined,
+          observacoes: editandoMembro.observacoes || undefined,
+        } : null}
+        unidades={unidades}
+        isSaving={isSaving}
+      />
+
+      {/* Modal de detalhes do membro */}
+      <MembroDetailModal
+        isOpen={!!membroSelecionado}
+        onClose={() => setMembroSelecionado(null)}
+        onEdit={handleEditarDeDetalhes}
+        membro={membroSelecionado}
+        unidadeCores={membroSelecionado?.unidade_id ? unidadesCores[membroSelecionado.unidade_id] : undefined}
+      />
+
+      {/* Modal de membros inativos */}
+      <MembroInativoModal
+        isOpen={showInativos}
+        onClose={() => setShowInativos(false)}
+        membrosInativos={membrosInativos}
+        onAtivar={handleAtivarMembro}
+        onVerDetalhes={(membro) => {
+          const membroData = membros.find(m => m.id === membro.id);
+          if (membroData) {
+            setEditandoMembro(membroData);
+            setShowInativos(false);
+            setShowForm(true);
+          }
+        }}
+        unidades={unidades}
+        unidadesCores={unidadesCores}
       />
     </AppLayout>
   );

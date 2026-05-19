@@ -9,6 +9,7 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppSelect } from '@/components/ui/AppSelect';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth, UserRole } from '@/hooks';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -146,11 +147,9 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      const { error } = await import('@/lib/supabase').then(m =>
-        m.supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/profile?reset=true`,
-        })
-      );
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/profile?reset=true`,
+      });
 
       if (error) {
         addToast({

@@ -6,7 +6,7 @@ import { cn } from '@/utils/cn';
 interface UnitHeaderProps {
   name: string;
   cores: string[];
-  gender: 'M' | 'F' | 'MISTA';
+  gender: 'M' | 'F' ;
   gritoDeGuerra?: string;
   icon?: LucideIcon;
   className?: string;
@@ -23,7 +23,6 @@ export function UnitHeader({
   const genderLabels = {
     M: 'Masculina',
     F: 'Feminina',
-    MISTA: 'Mista',
   };
 
   const gradientStyle = cores.length === 1

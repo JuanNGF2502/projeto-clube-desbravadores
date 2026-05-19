@@ -1,33 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Check, Clock, Trophy, Users, ChevronDown, User } from 'lucide-react';
+import { BookOpen, Check, Clock, Trophy, Users, ChevronDown, User, Loader2, GraduationCap } from 'lucide-react';
+import { cn } from '@/utils/cn';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppStatsCard } from '@/components/ui/AppStatsCard';
+import { ProgressCircle } from '@/components/ui/ProgressCircle';
 import { useToast } from '@/components/ui/Toast';
 import { DEFAULT_CLASSES, Classe } from '@/types';
 import { ClassRequirementsPopup } from '@/components/classes';
-import { cn } from '@/utils/cn';
-
-interface Requirement {
-  id: string;
-  name: string;
-  description: string;
-  completed: boolean;
-  completedAt?: Date;
-}
-
-interface Area {
-  id: string;
-  name: string;
-  icon: string;
-  requirements: Requirement[];
-}
+import { getClasses, getEstatisticasClasse, getRequisitosPorClasse, getMembrosComProgresso, RequisitoClasse, MembroComProgresso, updateProgressoRequisito, getStatusInstrucaoPorClasse, salvarInstrucaoRequisito, getProgressoInstrucaoClasse } from '@/lib/queries/classes';
+import { getMembrosPorClasse } from '@/lib/queries/dashboard';
+import { useClubId } from '@/hooks';
 
 interface MemberClassProgress {
   memberId: string;
@@ -36,19 +25,10 @@ interface MemberClassProgress {
   classId: string;
   className: string;
   classColor: string;
-  areas: Area[];
+  areas: any[];
   completedRequirements: number;
   totalRequirements: number;
   progressPercentage: number;
-}
-
-interface Member {
-  id: string;
-  nome: string;
-  unidade: string;
-  dataNascimento: Date;
-  email?: string;
-  telefone?: string;
 }
 
 interface MemberClass {
@@ -62,265 +42,79 @@ interface MemberClass {
   progress: number;
   members: Member[];
   memberProgress: MemberClassProgress[];
+  requisitos: RequisitoClasse[];
+  // Controle de instrução
+  ensinadosCount?: number;
+  instrucaoPercentage?: number;
+}
+
+interface Member {
+  id: string;
+  nome: string;
+  unidade: string;
+  dataNascimento: Date;
+  email?: string;
+  telefone?: string;
 }
 
 interface ClassProgress {
   classId: string;
   className: string;
   classColor: string;
-  areas: Area[];
+  areas: any[];
   completedRequirements: number;
   totalRequirements: number;
   progressPercentage: number;
 }
 
-// Requirements by area for each class
-const classAreasData: Record<string, Area[]> = {
-  '1': [
-    {
-      id: 'spiritual',
-      name: 'Espiritualidade',
-      icon: 'book',
-      requirements: [
-        { id: '1-s-1', name: 'Participar de 3 encontros', description: 'Estar presente em pelo menos 3 encontros', completed: false },
-        { id: '1-s-2', name: 'Memorizar a Lei', description: 'Decorar e recitar a Lei dos Desbravadores', completed: false },
-        { id: '1-s-3', name: 'Conhecer a estrutura', description: 'Saber nomes dos diretores e conselheiros', completed: false },
-      ],
-    },
-    {
-      id: 'uniform',
-      name: 'Uniforme',
-      icon: 'star',
-      requirements: [
-        { id: '1-u-1', name: 'Apresentar a Bíblia', description: 'Trazer sua própria Bíblia', completed: false },
-        { id: '1-u-2', name: 'Ter o uniforme básico', description: 'Camiseta e calça do clube', completed: false },
-      ],
-    },
-    {
-      id: 'outdoor',
-      name: 'Atividades ao Ar Livre',
-      icon: 'map',
-      requirements: [
-        { id: '1-o-1', name: 'Primeira caminhada', description: 'Participar de uma caminhada', completed: false },
-      ],
-    },
-  ],
-  '2': [
-    {
-      id: 'spiritual',
-      name: 'Espiritualidade',
-      icon: 'book',
-      requirements: [
-        { id: '2-s-1', name: 'Completar classe Amigo', description: 'Ter todas as especialidades da classe anterior', completed: false },
-        { id: '2-s-2', name: 'Participar de 5 encontros', description: 'Estar presente em pelo menos 5 encontros', completed: false },
-        { id: '2-s-3', name: 'Liderar uma atividade', description: 'Coordenar uma atividade da unidade', completed: false },
-      ],
-    },
-    {
-      id: 'skills',
-      name: 'Habilidades',
-      icon: 'star',
-      requirements: [
-        { id: '2-h-1', name: 'Ensinar uma habilidade', description: 'Ensinar algo que sabe para outro desbravador', completed: false },
-        { id: '2-h-2', name: 'Fazer uma caminhada', description: 'Participar de caminhada de pelo menos 5km', completed: false },
-      ],
-    },
-    {
-      id: 'community',
-      name: 'Comunidade',
-      icon: 'heart',
-      requirements: [
-        { id: '2-c-1', name: 'Ajudar novo membro', description: 'Apoiar integração de novo desbravador', completed: false },
-      ],
-    },
-  ],
-  '3': [
-    {
-      id: 'spiritual',
-      name: 'Espiritualidade',
-      icon: 'book',
-      requirements: [
-        { id: '3-s-1', name: 'Completar classes anteriores', description: 'Ter concluído todas as classes até Companheiro', completed: false },
-        { id: '3-s-2', name: 'Estudar 2 especialidades', description: 'Completar pelo menos 2 especialidades', completed: false },
-        { id: '3-s-3', name: 'Apresentar devoção', description: 'Conduzir um momento devocional', completed: false },
-      ],
-    },
-    {
-      id: 'outdoor',
-      name: 'Vida ao Ar Livre',
-      icon: 'map',
-      requirements: [
-        { id: '3-o-1', name: 'Participar de acampamento', description: 'Participar de pelo menos 1 acampamento', completed: false },
-        { id: '3-o-2', name: 'Acender fogo', description: 'Demonstrar habilidade de fazer fogo', completed: false },
-      ],
-    },
-    {
-      id: 'leadership',
-      name: 'Liderança',
-      icon: 'shield',
-      requirements: [
-        { id: '3-l-1', name: 'Ajudar novo membro', description: 'Acompanhar progresso de um desbravador mais novo', completed: false },
-      ],
-    },
-  ],
-  '4': [
-    {
-      id: 'spiritual',
-      name: 'Espiritualidade',
-      icon: 'book',
-      requirements: [
-        { id: '4-s-1', name: 'Completar todas as classes anteriores', description: 'Ter concluído até Pesquisador', completed: false },
-        { id: '4-s-2', name: 'Estudar 3 especialidades', description: 'Completar pelo menos 3 especialidades', completed: false },
-      ],
-    },
-    {
-      id: 'outdoor',
-      name: 'Vida ao Ar Livre',
-      icon: 'map',
-      requirements: [
-        { id: '4-o-1', name: 'Liderar acampamento', description: 'Participar da organização de um acampamento', completed: false },
-        { id: '4-o-2', name: 'Navegação', description: 'Demonstrar uso de mapa e bússola', completed: false },
-      ],
-    },
-    {
-      id: 'leadership',
-      name: 'Liderança',
-      icon: 'shield',
-      requirements: [
-        { id: '4-l-1', name: 'Mentoriar um desbravador', description: 'Acompanhar o progresso de um desbravador', completed: false },
-        { id: '4-l-2', name: 'Organizar evento', description: 'Coordenar um evento da unidade', completed: false },
-      ],
-    },
-    {
-      id: 'community',
-      name: 'Comunidade',
-      icon: 'heart',
-      requirements: [
-        { id: '4-c-1', name: 'Projeto comunitário', description: 'Participar de projeto de serviço', completed: false },
-      ],
-    },
-  ],
-  '5': [
-    {
-      id: 'spiritual',
-      name: 'Espiritualidade',
-      icon: 'book',
-      requirements: [
-        { id: '5-s-1', name: 'Completar classes até Pioneiro', description: 'Ter concluído todas as classes anteriores', completed: false },
-        { id: '5-s-2', name: 'Estudar 4 especialidades', description: 'Completar pelo menos 4 especialidades', completed: false },
-      ],
-    },
-    {
-      id: 'outdoor',
-      name: 'Vida ao Ar Livre',
-      icon: 'map',
-      requirements: [
-        { id: '5-o-1', name: 'Planejar expedição', description: 'Organizar e liderar uma expedição', completed: false },
-        { id: '5-o-2', name: 'Sobrevivência', description: 'Demonstrar técnicas de sobrevivência', completed: false },
-      ],
-    },
-    {
-      id: 'teaching',
-      name: 'Ensino',
-      icon: 'star',
-      requirements: [
-        { id: '5-t-1', name: 'Ensinar especialidades', description: 'Ministrar pelo menos 2 especialidades', completed: false },
-        { id: '5-t-2', name: 'Uniforme completo', description: 'Apresentar-se com uniforme completo em 5 ocasiões', completed: false },
-      ],
-    },
-  ],
-  '6': [
-    {
-      id: 'spiritual',
-      name: 'Espiritualidade',
-      icon: 'book',
-      requirements: [
-        { id: '6-s-1', name: 'Ser exemplo', description: 'Demonstrar conduta exemplar', completed: false },
-        { id: '6-s-2', name: 'Completar especialidades', description: 'Concluir todas as especialidades obrigatórias', completed: false },
-      ],
-    },
-    {
-      id: 'leadership',
-      name: 'Liderança',
-      icon: 'shield',
-      requirements: [
-        { id: '6-l-1', name: 'Liderar a unidade', description: 'Assumir papel de liderança', completed: false },
-        { id: '6-l-2', name: 'Apresentar testemunho', description: 'Compartilhar sua jornada como desbravador', completed: false },
-      ],
-    },
-    {
-      id: 'community',
-      name: 'Comunidade',
-      icon: 'heart',
-      requirements: [
-        { id: '6-c-1', name: 'Servir à comunidade', description: 'Participar de projetos de serviço', completed: false },
-        { id: '6-c-2', name: 'Projetos sociais', description: 'Liderar um projeto social', completed: false },
-      ],
-    },
-  ],
-};
+// Requirements by area for each class (from database)
+const getClassAreasData = (requisitos: any[]) => {
+  const areasMap: Record<string, any[]> = {};
 
-// Mock members
-const mockMembers: Member[] = [
-  { id: '1', nome: 'Lucas Silva', unidade: 'Lobos', dataNascimento: new Date('2010-05-15'), email: 'lucas@email.com' },
-  { id: '2', nome: 'Ana Costa', unidade: 'Lobos', dataNascimento: new Date('2011-03-20'), email: 'ana@email.com' },
-  { id: '3', nome: 'Pedro Santos', unidade: 'Águias', dataNascimento: new Date('2010-08-10'), email: 'pedro@email.com' },
-  { id: '4', nome: 'Maria Oliveira', unidade: 'Falcões', dataNascimento: new Date('2011-01-25'), email: 'maria@email.com' },
-  { id: '5', nome: 'João Ferreira', unidade: 'Tigres', dataNascimento: new Date('2009-11-30'), email: 'joao@email.com' },
-  { id: '6', nome: 'Sofia Rodrigues', unidade: 'Onças', dataNascimento: new Date('2010-07-22'), email: 'sofia@email.com' },
-  { id: '7', nome: 'Gabriel Lima', unidade: 'Lobos', dataNascimento: new Date('2010-04-18'), telefone: '11999999999' },
-];
+  requisitos.forEach((req) => {
+    if (!areasMap[req.area]) {
+      areasMap[req.area] = [];
+    }
+    areasMap[req.area].push({
+      id: req.id,
+      name: req.nome,
+      description: req.descricao || '',
+      completed: false,
+      ensinou: req.ensinou || false,
+    });
+  });
 
-// Generate member progress with random completion
-function generateMemberProgress(classId: string, member: Member): MemberClassProgress {
-  const areasData = classAreasData[classId] || [];
-
-  const areasWithStatus = areasData.map((area) => ({
-    ...area,
-    requirements: area.requirements.map((req) => ({
-      ...req,
-      completed: Math.random() > 0.5,
-      completedAt: Math.random() > 0.5 ? new Date() : undefined,
+  return Object.entries(areasMap).map(([area, requirements]) => ({
+    id: area.toLowerCase(),
+    name: area,
+    icon: getAreaIcon(area),
+    requirements: requirements.map((r) => ({
+      ...r,
+      completed: false,
+      ensinou: r.ensinou || false,
     })),
   }));
+};
 
-  const completedCount = areasWithStatus.reduce(
-    (acc, area) => acc + area.requirements.filter((r) => r.completed).length,
-    0
-  );
-  const totalCount = areasWithStatus.reduce((acc, area) => acc + area.requirements.length, 0);
-  const percentage = Math.round((completedCount / totalCount) * 100);
-
-  return {
-    memberId: member.id,
-    memberName: member.nome,
-    memberUnidade: member.unidade,
-    classId,
-    className: DEFAULT_CLASSES.find((c) => c.id === classId)?.nome || '',
-    classColor: DEFAULT_CLASSES.find((c) => c.id === classId)?.cor || '#C6A15B',
-    areas: areasWithStatus,
-    completedRequirements: completedCount,
-    totalRequirements: totalCount,
-    progressPercentage: percentage,
+const getAreaIcon = (area: string) => {
+  const icons: Record<string, string> = {
+    'Espiritualidade': 'book',
+    'Habilidades': 'star',
+    'Vida ao Ar Livre': 'map',
+    'Liderança': 'shield',
+    'Comunidade': 'heart',
+    'Ensino': 'star',
+    'Uniforme': 'star',
+    'Atividades ao Ar Livre': 'map',
   };
-}
-
-// Build initial classes with members
-const initialClasses: MemberClass[] = DEFAULT_CLASSES.map((classe, classIndex) => {
-  const classMembers = mockMembers.filter((_, i) => i % (DEFAULT_CLASSES.length - classIndex) === 0);
-  const memberProgress = classMembers.map((member) => generateMemberProgress(classe.id, member));
-
-  return {
-    ...classe,
-    completedBy: Math.floor(Math.random() * 15) + 5,
-    progress: Math.floor(Math.random() * 100),
-    members: classMembers,
-    memberProgress,
-  };
-});
+  return icons[area] || 'book';
+};
 
 export default function ClassesPage() {
-  const [classes] = useState<MemberClass[]>(initialClasses);
+  const clubId = useClubId();
+
+  const [classes, setClasses] = useState<MemberClass[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState<MemberClass | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
@@ -328,24 +122,122 @@ export default function ClassesPage() {
   const [selectedMemberProgress, setSelectedMemberProgress] = useState<MemberClassProgress | null>(null);
   const [isRequirementsModalOpen, setIsRequirementsModalOpen] = useState(false);
   const [selectedClassProgress, setSelectedClassProgress] = useState<ClassProgress | null>(null);
+  const [modoInstrutor, setModoInstrutor] = useState(false);
+  const [instrucaoProgress, setInstrucaoProgress] = useState<{ total: number; ensinados: number; percentage: number } | null>(null);
   const { addToast } = useToast();
 
-  const totalCompletions = classes.reduce((acc, c) => acc + c.completedBy, 0);
+  const carregarDados = async () => {
+    try {
+      setIsLoading(true);
+
+      // Buscar classes do banco
+      const classesData = await getClasses(true);
+
+      // Converter para formato da UI
+      const classesFormatadas = await Promise.all(
+        (classesData || []).map(async (classe: any) => {
+          // Buscar estatísticas da classe
+          const stats = await getEstatisticasClasse(classe.id);
+
+          // Buscar requisitos
+          const requisitos = await getRequisitosPorClasse(classe.id);
+
+          // Buscar membros com progresso nesta classe
+          const membrosComProgresso = await getMembrosComProgresso(clubId, classe.id);
+
+          // Buscar contagem de membros
+          const membrosData = await getMembrosPorClasse(clubId);
+          const membrosNaClasse = membrosData?.find(m => m.classeId === classe.id);
+
+          // Buscar progresso de instrução
+          const instrucao = await getProgressoInstrucaoClasse(classe.id);
+
+          // Buscar status de instrução dos requisitos
+          const statusInstrucao = await getStatusInstrucaoPorClasse(classe.id);
+
+          // Adicionar status de ensino aos requisitos para o popup
+          const requisitosComInstrucao = (requisitos || []).map(req => ({
+            ...req,
+            ensinou: statusInstrucao[req.id] || false,
+          }));
+
+          return {
+            ...classe,
+            completedBy: stats.membrosConcluiram || 0,
+            progress: membrosNaClasse ? Math.floor((stats.membrosConcluiram / (stats.membrosNaClasse || 1)) * 100) : 0,
+            members: [],
+            memberProgress: membrosComProgresso.map(m => ({
+              memberId: m.membroId,
+              memberName: m.membroNome,
+              memberUnidade: m.membroUnidade,
+              classId: classe.id,
+              className: classe.nome,
+              classColor: classe.cor,
+              areas: m.areas,
+              completedRequirements: m.completedCount,
+              totalRequirements: m.totalCount,
+              progressPercentage: m.progressPercentage,
+            })),
+            requisitos: requisitosComInstrucao,
+            ensinadosCount: instrucao.ensinados,
+            instrucaoPercentage: instrucao.percentage,
+          };
+        })
+      );
+
+      setClasses(classesFormatadas as MemberClass[]);
+    } catch (error) {
+      console.error('Erro ao carregar classes:', error);
+      // Fallback para DEFAULT_CLASSES se erro
+      setClasses(DEFAULT_CLASSES.map(c => ({
+        ...c,
+        completedBy: 0,
+        progress: 0,
+        members: [],
+        memberProgress: [],
+        requisitos: [],
+      })) as unknown as MemberClass[]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (clubId) {
+      carregarDados();
+    }
+  }, [clubId]);
 
   const handleClassClick = (classe: MemberClass) => {
-    // Create class progress data for the popup
+    const areas = getClassAreasData(classe.requisitos || []);
+
+    // Se modo instrutor, usar dados de progresso de instrução
+    const progressToUse = modoInstrutor
+      ? { ensinados: classe.ensinadosCount || 0, percentage: classe.instrucaoPercentage || 0 }
+      : { total: areas.reduce((acc, a) => acc + a.requirements.length, 0), ensinados: 0, percentage: 0 };
+
     const classProgress: ClassProgress = {
       classId: classe.id,
       className: classe.nome,
       classColor: classe.cor,
-      areas: classAreasData[classe.id] || [],
+      areas,
       completedRequirements: 0,
-      totalRequirements: (classAreasData[classe.id] || []).reduce(
-        (acc, area) => acc + area.requirements.length, 0
-      ),
-      progressPercentage: 0,
+      totalRequirements: areas.reduce((acc, a) => acc + a.requirements.length, 0),
+      progressPercentage: modoInstrutor ? (classe.instrucaoPercentage || 0) : classe.progress,
     };
     setSelectedClassProgress(classProgress);
+
+    // Se modo instrutor, salvar o progresso de instrução
+    if (modoInstrutor) {
+      setInstrucaoProgress({
+        total: areas.reduce((acc, a) => acc + a.requirements.length, 0),
+        ensinados: classe.ensinadosCount || 0,
+        percentage: classe.instrucaoPercentage || 0,
+      });
+    } else {
+      setInstrucaoProgress(null);
+    }
+
     setIsRequirementsModalOpen(true);
   };
 
@@ -358,8 +250,82 @@ export default function ClassesPage() {
   const handleMemberClick = (memberProgress: MemberClassProgress) => {
     setSelectedMemberProgress(memberProgress);
     setSelectedClassProgress(null);
+    setInstrucaoProgress(null);
     setIsRequirementsModalOpen(true);
   };
+
+  const handleSaveProgress = async (membroId: string, requisitoId: string, completado: boolean) => {
+    await updateProgressoRequisito(membroId, requisitoId, completado);
+  };
+
+  const handleSalvarInstrucao = async (requisitoId: string, ensinou: boolean) => {
+    if (!selectedClassProgress) {
+      console.error('selectedClassProgress é null');
+      addToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Não foi possível salvar a instrução. Selecione uma classe primeiro.',
+      });
+      return;
+    }
+    try {
+      console.log('Salvando instrução - classId:', selectedClassProgress.classId, 'requisitoId:', requisitoId, 'ensinou:', ensinou);
+      await salvarInstrucaoRequisito(selectedClassProgress.classId, requisitoId, ensinou);
+      console.log('Salvo com sucesso!');
+
+      // Atualizar o estado local do progresso
+      const novoProgress = {
+        total: instrucaoProgress?.total || 0,
+        ensinados: ensinou
+          ? (instrucaoProgress?.ensinados || 0) + 1
+          : Math.max(0, (instrucaoProgress?.ensinados || 0) - 1),
+        percentage: 0,
+      };
+      novoProgress.percentage = Math.round((novoProgress.ensinados / novoProgress.total) * 100);
+      setInstrucaoProgress(novoProgress);
+
+      // Recarregar dados para atualizar a lista de classes
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao salvar instrução:', error);
+      addToast({
+        type: 'error',
+        title: 'Erro',
+        message: 'Falha ao salvar instrução',
+      });
+    }
+  };
+
+  const handleRequirementsModalClose = () => {
+    setIsRequirementsModalOpen(false);
+    setSelectedMemberProgress(null);
+    setSelectedClassProgress(null);
+    setInstrucaoProgress(null);
+    // Recarregar dados
+    carregarDados();
+  };
+
+  const toggleModoInstrutor = async () => {
+    const novoModo = !modoInstrutor;
+    setModoInstrutor(novoModo);
+    // Reset progress quando muda modo
+    setInstrucaoProgress(null);
+    setSelectedClassProgress(null);
+    // Recarregar dados para buscar instruções
+    await carregarDados();
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout title="Classes" subtitle="Classes regulares dos desbravadores">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const totalCompletions = classes.reduce((acc, c) => acc + (c.completedBy || 0), 0);
 
   return (
     <AppLayout title="Classes" subtitle="Classes regulares dos desbravadores">
@@ -374,6 +340,62 @@ export default function ClassesPage() {
           <AppStatsCard label="Classes" value={classes.length} icon={BookOpen} color="primary" />
           <AppStatsCard label="Conclusões" value={totalCompletions} icon={Trophy} color="success" />
         </div>
+
+        {/* Modo Instrutor Toggle */}
+        <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
+          <div className="flex items-center gap-3">
+            <div className={cn("p-2 rounded-lg", modoInstrutor ? "bg-primary/20" : "bg-muted/30")}>
+              {modoInstrutor ? (
+                <GraduationCap className="w-5 h-5 text-primary" />
+              ) : (
+                <Users className="w-5 h-5 text-muted" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-color)' }}>
+                {modoInstrutor ? 'Modo Instrutor' : 'Modo Membro'}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>
+                {modoInstrutor
+                  ? 'Marque os requisitos que você ensinou'
+                  : 'Acompanhe o progresso dos membros'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={toggleModoInstrutor}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              modoInstrutor ? "bg-primary" : "bg-muted"
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                modoInstrutor ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </div>
+
+        {/* Instrução Stats (only in instrutor mode) */}
+        {modoInstrutor && (
+          <div className="grid grid-cols-3 gap-3">
+            {classes.map((classe) => (
+              <div
+                key={classe.id}
+                className="p-3 rounded-xl text-center"
+                style={{ backgroundColor: `${classe.cor}15`, border: `1px solid ${classe.cor}30` }}
+              >
+                <p className="text-xs font-medium" style={{ color: classe.cor }}>{classe.nome}</p>
+                <p className="text-lg font-bold" style={{ color: 'var(--text-color)' }}>
+                  {classe.ensinadosCount || 0}/{classe.requisitos?.length || 0}
+                </p>
+                <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>ensinados</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Classes List */}
         <div>
@@ -414,27 +436,42 @@ export default function ClassesPage() {
                       </div>
                       <p className="text-sm text-muted line-clamp-1">{classe.descricao}</p>
                       <div className="flex items-center gap-4 mt-2">
-                        <div className="flex items-center gap-1 text-xs text-muted">
-                          <Trophy className="w-3 h-3" />
-                          {classe.completedBy} conclusões
-                        </div>
+                        {modoInstrutor ? (
+                          <>
+                            <div className="flex items-center gap-1 text-xs text-primary">
+                              <GraduationCap className="w-3 h-3" />
+                              {classe.ensinadosCount || 0} ensinados
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted">
+                              <BookOpen className="w-3 h-3" />
+                              {(classe.requisitos?.length || 0)} requisitos
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-1 text-xs text-muted">
+                              <Trophy className="w-3 h-3" />
+                              {classe.completedBy || 0} conclusões
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-muted">
+                              <BookOpen className="w-3 h-3" />
+                              {(classe.requisitos?.length || 0)} requisitos
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <div className="w-full max-w-[100px]">
-                      <div className="h-2 bg-card rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${classe.progress}%` }}
-                          transition={{ duration: 0.5, delay: index * 0.1 }}
-                          className="h-full rounded-full"
-                          style={{ backgroundColor: classe.cor }}
-                        />
-                      </div>
+                    <div className="flex items-center justify-center">
+                      <ProgressCircle
+                        value={modoInstrutor ? (classe.instrucaoPercentage || 0) : (classe.progress || 0)}
+                        size="md"
+                        color={classe.cor}
+                      />
                     </div>
                   </div>
 
-                  {/* Members section */}
-                  {classe.members.length > 0 && (
+                  {/* Members section - show if there are members in this class */}
+                  {classe.memberProgress && classe.memberProgress.length > 0 && (
                     <div className="mt-4 pt-3 border-t border-border/50">
                       <button
                         onClick={(e) => handleShowMembers(classe, e)}
@@ -443,7 +480,7 @@ export default function ClassesPage() {
                         <div className="flex items-center gap-2">
                           <Users className="w-4 h-4 text-primary" />
                           <span className="text-sm text-text-primary">
-                            {classe.members.length} desbravadores
+                            {classe.memberProgress.length} desbravadores
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -459,7 +496,6 @@ export default function ClassesPage() {
                         </div>
                       </button>
 
-                      {/* Expanded member list */}
                       <AnimatePresence>
                         {expandedClass === classe.id && (
                           <motion.div
@@ -517,7 +553,7 @@ export default function ClassesPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={selectedClass?.nome || ''}
-        description={`Classe ${selectedClass?.ordem} de ${DEFAULT_CLASSES.length}`}
+        description={`Classe ${selectedClass?.ordem} de ${classes.length}`}
         size="lg"
       >
         {selectedClass && (
@@ -542,7 +578,7 @@ export default function ClassesPage() {
             <div>
               <h4 className="font-medium text-text-primary mb-3">Áreas de Atuação</h4>
               <div className="grid grid-cols-2 gap-2">
-                {(classAreasData[selectedClass.id] || []).map((area) => (
+                {getClassAreasData(selectedClass.requisitos || []).map((area) => (
                   <div
                     key={area.id}
                     className="p-3 bg-card rounded-xl border border-border"
@@ -575,10 +611,10 @@ export default function ClassesPage() {
         isOpen={isMembersModalOpen}
         onClose={() => setIsMembersModalOpen(false)}
         title={selectedClass?.nome}
-        description={`Progresso de ${selectedClass?.members.length} desbravadores`}
+        description={`Progresso de ${selectedClass?.memberProgress?.length || 0} desbravadores`}
         size="md"
       >
-        {selectedClass && (
+        {selectedClass && selectedClass.memberProgress && selectedClass.memberProgress.length > 0 && (
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {selectedClass.memberProgress.map((progress) => (
               <button
@@ -618,9 +654,14 @@ export default function ClassesPage() {
 
       {/* Member/Class Requirements Popup */}
       <ClassRequirementsPopup
+        key={selectedClassProgress?.classId}
         isOpen={isRequirementsModalOpen}
-        onClose={() => setIsRequirementsModalOpen(false)}
+        onClose={handleRequirementsModalClose}
         initialProgress={selectedClassProgress || selectedMemberProgress}
+        onSaveProgress={selectedMemberProgress ? handleSaveProgress : undefined}
+        modoInstrutor={modoInstrutor}
+        onSalvarInstrucao={modoInstrutor && selectedClassProgress ? handleSalvarInstrucao : undefined}
+        instrucaoProgress={instrucaoProgress || undefined}
       />
     </AppLayout>
   );

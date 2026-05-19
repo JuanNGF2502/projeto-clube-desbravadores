@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS public.criterios_avaliacao (
   CONSTRAINT criterios_avaliacao_pkey PRIMARY KEY (id)
 );
 
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT SELECT ON TABLE public.criterios_avaliacao TO authenticated;
+
 -- Seed com os critérios padrão do projeto
 INSERT INTO public.criterios_avaliacao (nome, descricao, ordem, pontos_a, descricao_a, pontos_b, descricao_b, pontos_c, descricao_c, ativo) VALUES
 ('Pontualidade', 'Presença e pontualidade nos encontros', 1, 20, 'Presente a tempo', 10, 'Atrasado (até 15min)', 0, 'Ausente', true),

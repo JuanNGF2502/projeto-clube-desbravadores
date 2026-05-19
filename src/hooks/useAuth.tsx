@@ -97,10 +97,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error) {
+      if (error && (error as any).code !== 'PGRST116') {
         console.error('Erro ao buscar profile:', error);
+        return;
+      }
+
+      // Se não encontrou profile, tentar criar um com dados do auth.user
+      if (!data) {
+        console.warn('Profile não encontrado, criando novo...');
+        const { data: userData, error: userErr } = await supabase.auth.getUser();
+        if (userErr) {
+          console.error('Erro ao obter usuário do auth:', userErr);
+          return;
+        }
+
+        const user = userData?.user;
+        if (user) {
+          const nomeFromMeta = (user.user_metadata as any)?.nome || user.email?.split('@')[0] || 'Usuário';
+          const roleFromMeta = (user.user_metadata as any)?.role || 'DESBRAVADOR';
+
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              nome: nomeFromMeta,
+              email: user.email || '',
+              role: roleFromMeta,
+              ativo: true,
+            })
+            .select()
+            .maybeSingle();
+
+          if (createError) {
+            console.error('Erro ao criar profile:', createError);
+            return;
+          }
+
+          if (newProfile) setProfile(newProfile as Profile);
+        }
+
         return;
       }
 
@@ -112,10 +149,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           .from('clubes')
           .select('id, nome, cidade, estado')
           .eq('id', data.clube_id)
-          .single();
+          .maybeSingle();
 
         if (clube) {
-          setClubeAtual(clube);
+          setClubeAtual(clube as any);
         }
       }
     } catch (error) {
@@ -126,16 +163,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Login
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-      if (error) {
-        return { error };
+      if (error) return { error };
+
+      // Atualizar estado local imediatamente
+      if (data?.user) {
+        setUser(data.user as User);
+      }
+      if (data?.session) {
+        setSession(data.session as Session);
       }
 
-      if (data.user) {
+      if (data?.user?.id) {
         await fetchProfile(data.user.id);
       }
 

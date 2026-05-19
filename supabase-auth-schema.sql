@@ -56,33 +56,30 @@ CREATE POLICY "Users can view own profile"
     ON profiles FOR SELECT
     USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+CREATE POLICY "Users can insert own profile"
+    ON profiles FOR INSERT
+    WITH CHECK (auth.uid() = id);
+
 -- Usuários podem atualizar seus próprios dados
 DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile"
     ON profiles FOR UPDATE
-    USING (auth.uid() = id);
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
 
--- Apenas admins podem ver todos os profiles
-DROP POLICY IF EXISTS "Admins can view all profiles" ON profiles;
-CREATE POLICY "Admins can view all profiles"
-    ON profiles FOR SELECT
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE id = auth.uid() AND role = 'ADMIN'
-        )
-    );
+-- Permissões necessárias para authenticated acessar dados usados pela aplicação
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON TABLE public.profiles TO authenticated;
+GRANT SELECT ON TABLE public.criterios_avaliacao TO authenticated;
+GRANT SELECT ON TABLE public.unidades TO authenticated;
+GRANT SELECT ON TABLE public.clubes TO authenticated;
+GRANT SELECT ON TABLE public.membros TO authenticated;
+GRANT SELECT ON TABLE public.classes TO authenticated;
+GRANT SELECT ON TABLE public.especialidades TO authenticated;
+GRANT SELECT ON TABLE public.avaliacoes TO authenticated;
 
--- Apenas admins podem modificar roles
-DROP POLICY IF EXISTS "Admins can update roles" ON profiles;
-CREATE POLICY "Admins can update roles"
-    ON profiles FOR UPDATE
-    USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE id = auth.uid() AND role = 'ADMIN'
-        )
-    );
+-- Admin policies removed because they caused recursive policy evaluation on profiles and are not required for basic login functionality.
 
 -- Habilitar verificação de email (opcional)
 ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email_confirmed_at TIMESTAMPTZ;

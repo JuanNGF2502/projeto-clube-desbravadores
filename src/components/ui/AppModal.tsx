@@ -9,7 +9,7 @@ import { AppButton } from './AppButton';
 interface AppModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title?: string | ReactNode;
   description?: string;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';

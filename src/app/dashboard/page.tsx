@@ -1,33 +1,61 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, BookOpen, Award, TrendingUp, Calendar, Star } from 'lucide-react';
+import { Users, BookOpen, Award, TrendingUp, Calendar, Star, Loader2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppStatsCard } from '@/components/ui/AppStatsCard';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
+import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse } from '@/lib/queries';
 import { DEFAULT_CLASSES } from '@/types';
+import { useClubId } from '@/hooks';
+
+interface RankingUnidade {
+  id: string;
+  nome: string;
+  cores: string[];
+  totalMembros: number;
+  totalPontos: number;
+  posicao: number;
+}
 
 export default function DashboardPage() {
-  const stats = [
-    { label: 'Total Membros', value: 48, icon: Users, trend: { value: 12, label: 'este mês' } },
-    { label: 'Unidades', value: 6, icon: Star, trend: { value: 2, label: 'novas' } },
-    { label: 'Classes', value: 24, icon: BookOpen, trend: { value: 8, label: 'concluídas' } },
-    { label: 'Especialidades', value: 156, icon: Award, trend: { value: 15, label: 'este trimestre' } },
-  ];
+  const clubId = useClubId();
 
-  const recentActivity = [
-    { id: '1', user: 'Ana Silva', action: 'concluiu classe', target: 'Companheiro', time: 'há 2h' },
-    { id: '2', user: 'Pedro Santos', action: 'completou especialidade', target: 'Primeiros Socorros', time: 'há 4h' },
-    { id: '3', user: 'Maria Oliveira', action: 'entrou na unidade', target: 'Desbravadores Norte', time: 'há 1 dia' },
-  ];
+  const [estatisticas, setEstatisticas] = useState({
+    totalMembros: 0,
+    membrosAtivos: 0,
+    totalUnidades: 0,
+    totalClassesConcluidas: 0,
+    totalEspecialidades: 0,
+  });
+  const [ranking, setRanking] = useState<RankingUnidade[]>([]);
+  const [membrosPorClasse, setMembrosPorClasse] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const rankingUnits = [
-    { name: 'Lobos', members: 12, points: 850, color: '#3B82F6' },
-    { name: 'Águias', members: 10, points: 780, color: '#C6A15B' },
-    { name: 'Falcões', members: 11, points: 720, color: '#EF4444' },
-    { name: 'Tigres', members: 8, points: 650, color: '#22C55E' },
-  ];
+  useEffect(() => {
+    if (!clubId) return;
+
+    const carregarDados = async () => {
+      try {
+        const [stats, rankingData, classesData] = await Promise.all([
+          getEstatisticasClube(clubId),
+          getRankingUnidades(clubId),
+          getMembrosPorClasse(clubId),
+        ]);
+        setEstatisticas(stats);
+        setRanking(rankingData);
+        setMembrosPorClasse(classesData);
+      } catch (error) {
+        console.error('Erro ao carregar dashboard:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, [clubId]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -42,10 +70,20 @@ export default function DashboardPage() {
     visible: { opacity: 1, y: 0 },
   };
 
+  if (isLoading) {
+    return (
+      <AppLayout title="Dashboard" subtitle="Visao geral do clube">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout
       title="Dashboard"
-      subtitle="Visão geral do clube"
+      subtitle="Visao geral do clube"
       actions={
         <button className="p-2 rounded-xl bg-card border border-border hover:bg-primary/10 transition-colors">
           <BellIcon className="w-5 h-5 text-text-primary" />
@@ -73,79 +111,67 @@ export default function DashboardPage() {
         {/* Stats Grid */}
         <motion.div variants={itemVariants}>
           <div className="grid grid-cols-2 gap-3">
-            {stats.map((stat, index) => (
-              <AppStatsCard
-                key={index}
-                label={stat.label}
-                value={stat.value}
-                icon={stat.icon}
-                trend={stat.trend}
-                color={index === 0 ? 'primary' : index === 1 ? 'success' : index === 2 ? 'info' : 'warning'}
-              />
-            ))}
+            <AppStatsCard
+              label="Total Membros"
+              value={estatisticas.totalMembros}
+              icon={Users}
+              trend={{ value: estatisticas.membrosAtivos, label: 'ativos' }}
+              color="primary"
+            />
+            <AppStatsCard
+              label="Unidades"
+              value={estatisticas.totalUnidades}
+              icon={Star}
+              color="success"
+            />
+            <AppStatsCard
+              label="Classes"
+              value={estatisticas.totalClassesConcluidas}
+              icon={BookOpen}
+              color="info"
+            />
+            <AppStatsCard
+              label="Especialidades"
+              value={estatisticas.totalEspecialidades}
+              icon={Award}
+              color="warning"
+            />
           </div>
-        </motion.div>
-
-        {/* Recent Activity */}
-        <motion.div variants={itemVariants}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-text-primary">Atividade Recente</h3>
-            <AppBadge variant="ghost" size="sm">
-              Ver todas
-            </AppBadge>
-          </div>
-          <AppCard padding="sm" className="space-y-3">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center justify-between py-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-text-primary">
-                      <span className="font-medium">{activity.user}</span>{' '}
-                      <span className="text-muted">{activity.action}</span>
-                    </p>
-                    <p className="text-xs text-primary">{activity.target}</p>
-                  </div>
-                </div>
-                <span className="text-xs text-muted">{activity.time}</span>
-              </div>
-            ))}
-          </AppCard>
         </motion.div>
 
         {/* Ranking Units */}
-        <motion.div variants={itemVariants}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-text-primary">Ranking de Unidades</h3>
-            <AppBadge variant="primary" size="sm">
-              <TrendingUp className="w-3 h-3" />
-              Este mês
-            </AppBadge>
-          </div>
-          <AppCard padding="sm" className="space-y-3">
-            {rankingUnits.map((unit, index) => (
-              <div key={unit.name} className="flex items-center gap-3 py-2">
-                <span className="w-6 text-sm font-bold text-muted">#{index + 1}</span>
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: `${unit.color}20` }}
-                >
-                  <Star className="w-5 h-5" style={{ color: unit.color }} />
+        {ranking.length > 0 ? (
+          <motion.div variants={itemVariants}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-text-primary">Ranking de Unidades</h3>
+              <AppBadge variant="primary" size="sm">
+                <TrendingUp className="w-3 h-3" />
+                Este mes
+              </AppBadge>
+            </div>
+            <AppCard padding="sm" className="space-y-3">
+              {ranking.slice(0, 4).map((unit, index) => (
+                <div key={unit.id} className="flex items-center gap-3 py-2">
+                  <span className="w-6 text-sm font-bold text-muted">#{index + 1}</span>
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: `${unit.cores?.[0] || '#3B82F6'}20` }}
+                  >
+                    <Star className="w-5 h-5" style={{ color: unit.cores?.[0] || '#3B82F6' }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-text-primary">{unit.nome}</p>
+                    <p className="text-xs text-muted">{unit.totalMembros} membros</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-primary">{unit.totalPontos}</p>
+                    <p className="text-xs text-muted">pontos</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-text-primary">{unit.name}</p>
-                  <p className="text-xs text-muted">{unit.members} membros</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-primary">{unit.points}</p>
-                  <p className="text-xs text-muted">pontos</p>
-                </div>
-              </div>
-            ))}
-          </AppCard>
-        </motion.div>
+              ))}
+            </AppCard>
+          </motion.div>
+        ) : null}
 
         {/* Classes Progress */}
         <motion.div variants={itemVariants}>
@@ -154,23 +180,26 @@ export default function DashboardPage() {
             <Calendar className="w-5 h-5 text-muted" />
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-            {DEFAULT_CLASSES.map((classe) => (
-              <AppCard
-                key={classe.id}
-                padding="sm"
-                className="min-w-[100px] flex-shrink-0 text-center"
-                hover
-              >
-                <div
-                  className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
-                  style={{ backgroundColor: `${classe.cor}20` }}
+            {DEFAULT_CLASSES.map((classe) => {
+              const count = membrosPorClasse.find(m => m.classeId === classe.id)?.count || 0;
+              return (
+                <AppCard
+                  key={classe.id}
+                  padding="sm"
+                  className="min-w-[100px] flex-shrink-0 text-center"
+                  hover
                 >
-                  <BookOpen className="w-5 h-5" style={{ color: classe.cor }} />
-                </div>
-                <p className="text-sm font-medium text-text-primary">{classe.nome}</p>
-                <p className="text-xs text-muted">{Math.floor(Math.random() * 10) + 1} conclusões</p>
-              </AppCard>
-            ))}
+                  <div
+                    className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
+                    style={{ backgroundColor: `${classe.cor}20` }}
+                  >
+                    <BookOpen className="w-5 h-5" style={{ color: classe.cor }} />
+                  </div>
+                  <p className="text-sm font-medium text-text-primary">{classe.nome}</p>
+                  <p className="text-xs text-muted">{count} membros</p>
+                </AppCard>
+              );
+            })}
           </div>
         </motion.div>
       </motion.div>

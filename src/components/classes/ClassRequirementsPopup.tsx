@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, RotateCcw } from 'lucide-react';
+import { Check, RotateCcw, GraduationCap, UserCheck, BookOpen, Loader2 } from 'lucide-react';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppButton } from '@/components/ui/AppButton';
@@ -16,6 +16,8 @@ interface Requirement {
   description: string;
   completed: boolean;
   completedAt?: Date;
+  ensinou?: boolean;
+  dataEnsino?: string;
 }
 
 interface Area {
@@ -54,6 +56,15 @@ interface ClassRequirementsPopupProps {
   isOpen: boolean;
   onClose: () => void;
   initialProgress: ProgressData | null;
+  onSaveProgress?: (membroId: string, requisitoId: string, completado: boolean) => Promise<void>;
+  // Props para modo instrutor (controle de ensino)
+  modoInstrutor?: boolean;
+  onSalvarInstrucao?: (requisitoId: string, ensinou: boolean) => Promise<void>;
+  instrucaoProgress?: {
+    total: number;
+    ensinados: number;
+    percentage: number;
+  };
 }
 
 const areaIcons: Record<string, string> = {
@@ -68,22 +79,52 @@ export function ClassRequirementsPopup({
   isOpen,
   onClose,
   initialProgress,
+  onSaveProgress,
+  modoInstrutor = false,
+  onSalvarInstrucao,
+  instrucaoProgress,
 }: ClassRequirementsPopupProps) {
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [progressPercentage, setProgressPercentage] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
+  const [ensinadosCount, setEnsinadosCount] = useState(0);
+  const [instrucaoPercentage, setInstrucaoPercentage] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
   const { addToast } = useToast();
 
   // Initialize state when progress changes
   useEffect(() => {
     if (initialProgress) {
-      setAreas(JSON.parse(JSON.stringify(initialProgress.areas)));
+      const areasCopy = JSON.parse(JSON.stringify(initialProgress.areas));
+
+      // Se modo instrutor, garantir que ensinou status está sendo usado
+      if (modoInstrutor) {
+        // Recalcular contagem de ensinados
+        const totalEnsinados = areasCopy.reduce(
+          (acc: number, area: any) => acc + area.requirements.filter((r: any) => r.ensinou).length,
+          0
+        );
+        const totalReqs = areasCopy.reduce(
+          (acc: number, area: any) => acc + area.requirements.length,
+          0
+        );
+        setEnsinadosCount(totalEnsinados);
+        setInstrucaoPercentage(Math.round((totalEnsinados / totalReqs) * 100));
+      }
+
+      setAreas(areasCopy);
       setProgressPercentage(initialProgress.progressPercentage);
       setCompletedCount(initialProgress.completedRequirements);
       setSelectedArea(null);
+
+      // Se tem dados de instrução, atualizar contadores
+      if (instrucaoProgress && modoInstrutor) {
+        setEnsinadosCount(instrucaoProgress.ensinados);
+        setInstrucaoPercentage(instrucaoProgress.percentage);
+      }
     }
-  }, [initialProgress]);
+  }, [initialProgress, instrucaoProgress, modoInstrutor]);
 
   // Check if it's a member progress or class progress
   const isMemberProgress = (progress: ProgressData): progress is MemberProgress => {
@@ -106,8 +147,110 @@ export function ClassRequirementsPopup({
     };
   };
 
-  // Toggle requirement
-  const toggleRequirement = (areaId: string, reqId: string) => {
+  // Toggle requirement (para membro) ou toggle ensino (para instrutor)
+  const toggleRequirement = async (areaId: string, reqId: string) => {
+    const isMemberProgressData = initialProgress && 'memberId' in initialProgress;
+    const memberId = isMemberProgressData ? (initialProgress as MemberProgress).memberId : null;
+
+    // Se for modo instrutor, tratar como ensino
+    if (modoInstrutor && onSalvarInstrucao) {
+      setIsSaving(true);
+      try {
+        const currentReq = areas
+          .find(a => a.id === areaId)
+          ?.requirements.find(r => r.id === reqId);
+
+        const novoStatus = !(currentReq?.ensinou);
+
+        console.log('Popup - chamando onSalvarInstrucao:', reqId, novoStatus);
+        await onSalvarInstrucao(reqId, novoStatus);
+        console.log('Popup - retorno do onSalvarInstrucao');
+
+        // Atualizar estado local
+        const updatedAreas = areas.map((area) => {
+          if (area.id === areaId) {
+            return {
+              ...area,
+              requirements: area.requirements.map((req) => {
+                if (req.id === reqId) {
+                  return {
+                    ...req,
+                    ensinou: novoStatus,
+                    dataEnsino: novoStatus ? new Date().toISOString() : undefined,
+                  };
+                }
+                return req;
+              }),
+            };
+          }
+          return area;
+        });
+
+        setAreas(updatedAreas);
+
+        // Recalcular ensinados
+        const totalEnsinados = updatedAreas.reduce(
+          (acc, area) => acc + area.requirements.filter((r) => r.ensinou).length,
+          0
+        );
+        const totalReqs = updatedAreas.reduce(
+          (acc, area) => acc + area.requirements.length,
+          0
+        );
+        setEnsinadosCount(totalEnsinados);
+        setInstrucaoPercentage(Math.round((totalEnsinados / totalReqs) * 100));
+
+        if (novoStatus) {
+          addToast({
+            type: 'success',
+            title: '✓ Requisito ensinado',
+            message: currentReq?.name || 'Requisito',
+          });
+        } else {
+          addToast({
+            type: 'warning',
+            title: '✗ Ensino removido',
+            message: currentReq?.name || 'Requisito',
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao salvar instrução:', error);
+        addToast({
+          type: 'error',
+          title: 'Erro',
+          message: 'Falha ao salvar instrução',
+        });
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    // Se for progresso de membro e houver callback, salvar no banco
+    if (memberId && onSaveProgress) {
+      setIsSaving(true);
+      try {
+        // Encontrar o requisito atual para inverter
+        const currentReq = areas
+          .find(a => a.id === areaId)
+          ?.requirements.find(r => r.id === reqId);
+
+        if (currentReq) {
+          await onSaveProgress(memberId, reqId, !currentReq.completed);
+        }
+      } catch (error) {
+        console.error('Erro ao salvar progresso:', error);
+        addToast({
+          type: 'error',
+          title: 'Erro',
+          message: 'Falha ao salvar progresso',
+        });
+        setIsSaving(false);
+        return;
+      }
+      setIsSaving(false);
+    }
+
     const updatedAreas = areas.map((area) => {
       if (area.id === areaId) {
         return {
@@ -248,21 +391,57 @@ export function ClassRequirementsPopup({
 
         {/* Overall Progress Bar */}
         <div>
-          <div className="flex justify-between mb-2">
-            <span className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Progresso geral</span>
-            <span className="text-sm font-medium text-primary">
-              {completedCount}/{totalReqs}
-            </span>
-          </div>
-          <div className="h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${progressPercentage}%` }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="h-full rounded-full"
-              style={{ backgroundColor: initialProgress.classColor }}
-            />
-          </div>
+          {modoInstrutor ? (
+            // Modo Instrutor - Progresso de Ensino
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <GraduationCap className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium" style={{ color: 'var(--text-color)' }}>Controle de Instrução</span>
+                <AppBadge
+                  variant={instrucaoPercentage === 100 ? 'success' : 'warning'}
+                  size="sm"
+                >
+                  {instrucaoPercentage}%
+                </AppBadge>
+              </div>
+              <div className="flex justify-between mb-1">
+                <span className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>Requisitos ensinados</span>
+                <span className="text-xs font-medium text-primary">
+                  {ensinadosCount}/{totalReqs}
+                </span>
+              </div>
+              <div className="h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${instrucaoPercentage}%` }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className="h-full rounded-full bg-primary"
+                />
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>
+                Clique em cada requisito para marcar como ensinado ou não ensinado
+              </p>
+            </div>
+          ) : (
+            // Modo Member - Progresso de Conclusão
+            <>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Progresso geral</span>
+                <span className="text-sm font-medium text-primary">
+                  {completedCount}/{totalReqs}
+                </span>
+              </div>
+              <div className="h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface-color)' }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPercentage}%` }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: initialProgress.classColor }}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Areas Horizontal Scroll */}
@@ -282,7 +461,10 @@ export function ClassRequirementsPopup({
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-2 px-2" style={{ scrollbarWidth: 'none' }}>
             {areas.map((area) => {
-              const areaCompleted = area.requirements.filter((r) => r.completed).length;
+              // No modo instrutor, contar ensinados. No modo membro, contar completados
+              const areaCompleted = modoInstrutor
+                ? area.requirements.filter((r) => r.ensinou).length
+                : area.requirements.filter((r) => r.completed).length;
               const areaTotal = area.requirements.length;
               const areaPercentage = Math.round((areaCompleted / areaTotal) * 100);
               const isSelected = selectedArea === area.id;
@@ -350,7 +532,10 @@ export function ClassRequirementsPopup({
                   </h4>
                 </div>
                 <AppBadge variant="secondary" size="sm">
-                  {currentArea.requirements.filter((r) => r.completed).length}/{currentArea.requirements.length}
+                  {modoInstrutor
+                    ? `${currentArea.requirements.filter((r) => r.ensinou).length}/${currentArea.requirements.length}`
+                    : `${currentArea.requirements.filter((r) => r.completed).length}/${currentArea.requirements.length}`
+                  }
                 </AppBadge>
               </div>
 
@@ -364,23 +549,31 @@ export function ClassRequirementsPopup({
                     onClick={() => toggleRequirement(currentArea.id, req.id)}
                     className={cn(
                       'w-full p-3 rounded-xl border transition-all text-left',
-                      req.completed
+                      modoInstrutor
+                        ? req.ensinou
+                          ? 'bg-primary/10 border-primary/30'
+                          : 'border-border'
+                        : req.completed
                         ? 'bg-success/10 border-success/30'
                         : 'border-border'
                     )}
-                    style={{ backgroundColor: req.completed ? undefined : 'var(--card-color)' }}
+                    style={{ backgroundColor: (modoInstrutor ? req.ensinou : req.completed) ? undefined : 'var(--card-color)' }}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={cn(
                           'w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all cursor-pointer',
-                          req.completed
+                          modoInstrutor
+                            ? req.ensinou
+                              ? 'bg-primary'
+                              : 'border'
+                            : req.completed
                             ? 'bg-success'
                             : 'border'
                         )}
-                        style={req.completed ? undefined : { borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-color)' }}
+                        style={req.completed || req.ensinou ? undefined : { borderColor: 'var(--border-color)', backgroundColor: 'var(--surface-color)' }}
                       >
-                        {req.completed ? (
+                        {req.completed || req.ensinou ? (
                           <Check className="w-4 h-4 text-white" />
                         ) : (
                           <span className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>{index + 1}</span>
@@ -390,14 +583,20 @@ export function ClassRequirementsPopup({
                         <p
                           className={cn(
                             'text-sm font-medium',
-                            req.completed ? 'text-success' : ''
+                            (modoInstrutor ? req.ensinou : req.completed) ? 'text-primary' : ''
                           )}
-                          style={req.completed ? undefined : { color: 'var(--text-color)' }}
+                          style={(modoInstrutor ? req.ensinou : req.completed) ? undefined : { color: 'var(--text-color)' }}
                         >
                           {req.name}
                         </p>
                         <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary-color)' }}>{req.description}</p>
-                        {req.completed && req.completedAt && (
+                        {modoInstrutor && req.ensinou && req.dataEnsino && (
+                          <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                            <UserCheck className="w-3 h-3" />
+                            Ensinado em {new Date(req.dataEnsino).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
+                        {!modoInstrutor && req.completed && req.completedAt && (
                           <p className="text-xs text-success mt-1">
                             ✓ Concluído em {new Date(req.completedAt).toLocaleDateString('pt-BR')}
                           </p>

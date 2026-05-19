@@ -1,21 +1,27 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Trophy, Medal, Star, Users, Calendar, Check, AlertCircle, Clock } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Trophy, Medal, Star, Users, Calendar, Check, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
+import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/utils/cn';
 import {
   CRITERIOS_AVALIACAO,
   CLASSIFICACOES,
-  RankingMembro,
   PontuacaoNivel,
   calcularClassificacao,
   calcularTotalPontos,
 } from '@/types';
+import {
+  getRankingMembrosDaUnidade,
+  getEstatisticasUnidade,
+  salvarAvaliacoesBatch,
+  getUltimaAvaliacaoDaUnidade,
+} from '@/lib/queries/dashboard';
 
 interface RankingModalProps {
   isOpen: boolean;
@@ -27,6 +33,26 @@ interface RankingModalProps {
 }
 
 type TabMode = 'ranking' | 'avaliar';
+
+interface RankingMembroData {
+  id: string;
+  nome: string;
+  foto?: string;
+  totalPontos: number;
+  classificacao: 'A' | 'B' | 'C';
+  ultimaAvaliacao: string | null;
+  posicao: number;
+  cargo?: string;
+  classe?: string;
+}
+
+interface EstatisticasUnidade {
+  totalMembros: number;
+  mediaPontos: number;
+  totalPontos: number;
+  ultimaAvaliacao: string | null;
+  distribuicaoClassificacao: { A: number; B: number; C: number };
+}
 
 export function RankingModal({
   isOpen,
@@ -40,80 +66,101 @@ export function RankingModal({
   const [selectedMembro, setSelectedMembro] = useState<string | null>(null);
   const [avaliacoes, setAvaliacoes] = useState<Record<string, Record<string, PontuacaoNivel>>>({});
   const [showResults, setShowResults] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [rankingData, setRankingData] = useState<RankingMembroData[]>([]);
+  const [estatisticas, setEstatisticas] = useState<EstatisticasUnidade | null>(null);
+  const [ultimaAvaliacao, setUltimaAvaliacao] = useState<string | null>(null);
+  const { addToast } = useToast();
 
-  // Mock ranking data
-  const rankingData: RankingMembro[] = useMemo(() => {
-    return [
+  // Carregar dados do ranking quando o modal abre
+  useEffect(() => {
+    if (!isOpen || !unidadeId) return;
+
+    const carregarDados = async () => {
+      try {
+        setIsLoading(true);
+        const [ranking, stats, ultima] = await Promise.all([
+          getRankingMembrosDaUnidade(unidadeId),
+          getEstatisticasUnidade(unidadeId),
+          getUltimaAvaliacaoDaUnidade(unidadeId),
+        ]);
+        setRankingData(ranking);
+        setEstatisticas(stats);
+        setUltimaAvaliacao(ultima);
+      } catch (error) {
+        console.error('Erro ao carregar ranking:', error);
+        addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar ranking' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, [isOpen, unidadeId]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setAvaliacoes({});
+      setShowResults(false);
+      setSelectedMembro(null);
+    }
+  }, [isOpen]);
+
+  // Mock ranking data (para fallback se banco vazio)
+  const mockRankingData: RankingMembroData[] = [
       {
         id: '1',
         nome: 'Lucas Silva',
-        funcao: 'Capitão',
+        cargo: 'Capitão',
         totalPontos: 142,
         classificacao: 'A',
-        ultimaAvaliacao: new Date('2026-05-11'),
-        historico: [
-          { data: new Date('2026-05-11'), pontos: 142, classificacao: 'A' },
-          { data: new Date('2026-05-04'), pontos: 138, classificacao: 'A' },
-          { data: new Date('2026-04-27'), pontos: 130, classificacao: 'A' },
-        ],
+        ultimaAvaliacao: '2026-05-11',
+        posicao: 1,
       },
       {
         id: '2',
         nome: 'Ana Costa',
-        funcao: 'Conselheiro',
+        cargo: 'Conselheiro',
         totalPontos: 135,
         classificacao: 'A',
-        ultimaAvaliacao: new Date('2026-05-11'),
-        historico: [
-          { data: new Date('2026-05-11'), pontos: 135, classificacao: 'A' },
-          { data: new Date('2026-05-04'), pontos: 140, classificacao: 'A' },
-          { data: new Date('2026-04-27'), pontos: 128, classificacao: 'A' },
-        ],
+        ultimaAvaliacao: '2026-05-11',
+        posicao: 2,
       },
       {
         id: '3',
         nome: 'Pedro Santos',
-        funcao: 'Secretário',
+        cargo: 'Secretário',
         totalPontos: 118,
         classificacao: 'B',
-        ultimaAvaliacao: new Date('2026-05-11'),
-        historico: [
-          { data: new Date('2026-05-11'), pontos: 118, classificacao: 'B' },
-          { data: new Date('2026-05-04'), pontos: 125, classificacao: 'A' },
-          { data: new Date('2026-04-27'), pontos: 110, classificacao: 'B' },
-        ],
+        ultimaAvaliacao: '2026-05-11',
+        posicao: 3,
       },
       {
         id: '4',
         nome: 'Maria Oliveira',
-        funcao: 'Membro',
+        cargo: 'Desbravador',
         totalPontos: 105,
         classificacao: 'B',
-        ultimaAvaliacao: new Date('2026-05-11'),
-        historico: [
-          { data: new Date('2026-05-11'), pontos: 105, classificacao: 'B' },
-          { data: new Date('2026-05-04'), pontos: 95, classificacao: 'B' },
-          { data: new Date('2026-04-27'), pontos: 88, classificacao: 'C' },
-        ],
+        ultimaAvaliacao: '2026-05-11',
+        posicao: 4,
       },
       {
         id: '5',
         nome: 'João Ferreira',
-        funcao: 'Membro',
+        cargo: 'Desbravador',
         totalPontos: 78,
         classificacao: 'C',
-        ultimaAvaliacao: new Date('2026-05-11'),
-        historico: [
-          { data: new Date('2026-05-11'), pontos: 78, classificacao: 'C' },
-          { data: new Date('2026-05-04'), pontos: 65, classificacao: 'C' },
-          { data: new Date('2026-04-27'), pontos: 72, classificacao: 'C' },
-        ],
+        ultimaAvaliacao: '2026-05-11',
+        posicao: 5,
       },
     ];
-  }, []);
 
-  const totalUnidade = rankingData.reduce((acc, m) => acc + m.totalPontos, 0);
-  const mediaUnidade = Math.round(totalUnidade / rankingData.length);
+  // Usar dados reais do banco ou mock como fallback
+  const dadosExibir = rankingData.length > 0 ? rankingData : mockRankingData;
+  const totalUnidade = estatisticas?.totalPontos || dadosExibir.reduce((acc, m) => acc + m.totalPontos, 0);
+  const mediaUnidade = estatisticas?.mediaPontos || Math.round(totalUnidade / (dadosExibir.length || 1));
 
   const handleAvaliar = (membroId: string, criterioId: string, nivel: PontuacaoNivel) => {
     setAvaliacoes((prev) => {
@@ -172,10 +219,54 @@ export function RankingModal({
     return CRITERIOS_AVALIACAO.every((c) => avaliacoes[m.id]?.[c.id]);
   });
 
-  const handleSalvarAvaliacoes = () => {
-    // In production: save to Supabase
-    console.log('Salvando avaliações:', avaliacoes);
-    setShowResults(true);
+  const handleSalvarAvaliacoes = async () => {
+    try {
+      setIsSaving(true);
+
+      // Montar avaliações para salvar
+      const dataAvaliacao = new Date().toISOString().split('T')[0];
+      const avaliacoesParaSalvar: Omit<{ membro_id: string; unidade_id: string; data: string; criterio_id: string; nivel: 'A' | 'B' | 'C'; pontos: number }, 'id'>[] = [];
+
+      Object.entries(avaliacoes).forEach(([membroId, criterios]) => {
+        Object.entries(criterios).forEach(([criterioId, nivel]) => {
+          const criterio = CRITERIOS_AVALIACAO.find(c => c.id === criterioId);
+          if (criterio) {
+            const opcao = criterio.opcoes.find(o => o.opcao === nivel);
+            if (opcao) {
+              avaliacoesParaSalvar.push({
+                membro_id: membroId,
+                unidade_id: unidadeId,
+                data: dataAvaliacao,
+                criterio_id: criterioId,
+                nivel,
+                pontos: opcao.pontos,
+              });
+            }
+          }
+        });
+      });
+
+      if (avaliacoesParaSalvar.length > 0) {
+        await salvarAvaliacoesBatch(avaliacoesParaSalvar);
+      }
+
+      // Recarregar ranking após salvar
+      const [ranking, stats] = await Promise.all([
+        getRankingMembrosDaUnidade(unidadeId),
+        getEstatisticasUnidade(unidadeId),
+      ]);
+      setRankingData(ranking);
+      setEstatisticas(stats);
+      setUltimaAvaliacao(dataAvaliacao);
+
+      setShowResults(true);
+      addToast({ type: 'success', title: 'Sucesso', message: 'Avaliações salvas com sucesso!' });
+    } catch (error) {
+      console.error('Erro ao salvar avaliações:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar avaliações' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const getClassificacaoInfo = (nivel: PontuacaoNivel) => {
@@ -207,17 +298,27 @@ export function RankingModal({
       <div className="grid grid-cols-3 gap-3 mb-4">
         <AppCard padding="sm" className="text-center">
           <p className="text-xs text-muted mb-1">Total da Unidade</p>
-          <p className="text-xl font-bold text-primary">{totalUnidade}</p>
+          {isLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" />
+          ) : (
+            <p className="text-xl font-bold text-primary">{totalUnidade}</p>
+          )}
         </AppCard>
         <AppCard padding="sm" className="text-center">
           <p className="text-xs text-muted mb-1">Média</p>
-          <p className="text-xl font-bold text-success">{mediaUnidade}</p>
+          {isLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin mx-auto text-success" />
+          ) : (
+            <p className="text-xl font-bold text-success">{mediaUnidade}</p>
+          )}
         </AppCard>
         <AppCard padding="sm" className="text-center">
           <p className="text-xs text-muted mb-1">Última Avaliação</p>
           <p className="text-sm font-bold text-text-primary flex items-center justify-center gap-1">
             <Calendar className="w-3 h-3" />
-            11/05
+            {ultimaAvaliacao
+              ? new Date(ultimaAvaliacao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+              : '—'}
           </p>
         </AppCard>
       </div>
@@ -245,46 +346,61 @@ export function RankingModal({
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
-        <AnimatePresence mode="wait">
-          {activeTab === 'ranking' ? (
-            <motion.div
-              key="ranking"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              className="space-y-3"
-            >
-              {rankingData.map((membro, index) => {
-                const classInfo = getClassificacaoInfo(membro.classificacao);
-                return (
-                  <motion.div
-                    key={membro.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <AppCard
-                      hover
-                      className={cn(
-                        'flex items-center gap-3 transition-all',
-                        index === 0 && 'ring-2 ring-yellow-400/50'
-                      )}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : dadosExibir.length === 0 ? (
+          <div className="text-center py-12">
+            <Trophy className="w-12 h-12 text-muted mx-auto mb-3" />
+            <p className="text-muted">Nenhum dado de ranking disponível</p>
+            <p className="text-xs text-muted mt-1">Realize avaliações para ver o ranking</p>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            {activeTab === 'ranking' ? (
+              <motion.div
+                key="ranking"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                className="space-y-3"
+              >
+                {dadosExibir.map((membro, index) => {
+                  const classInfo = getClassificacaoInfo(membro.classificacao);
+                  return (
+                    <motion.div
+                      key={membro.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
                     >
-                      {/* Posição */}
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted/20">
-                        {getMedalha(index + 1)}
-                      </div>
-
-                      {/* Avatar */}
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{
-                          background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2]})`,
-                        }}
+                      <AppCard
+                        hover
+                        className={cn(
+                          'flex items-center gap-3 transition-all',
+                          index === 0 && 'ring-2 ring-yellow-400/50'
+                        )}
                       >
-                        <span className="text-white font-bold text-sm">
-                          {membro.nome.charAt(0)}
-                        </span>
+                        {/* Posição */}
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted/20">
+                          {getMedalha(index + 1)}
+                        </div>
+
+                        {/* Avatar */}
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{
+                            background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2] || unidadeCores[0]})`,
+                          }}
+                        >
+                          {membro.foto ? (
+                            <img src={membro.foto} alt={membro.nome} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            <span className="text-white font-bold text-sm">
+                              {membro.nome.charAt(0)}
+                            </span>
+                          )}
                       </div>
 
                       {/* Info */}
@@ -301,7 +417,7 @@ export function RankingModal({
                             {classInfo.label}
                           </AppBadge>
                         </div>
-                        <p className="text-xs text-muted">{membro.funcao}</p>
+                        <p className="text-xs text-muted">{(membro as any).cargo || (membro as any).funcao || 'Desbravador'}</p>
                       </div>
 
                       {/* Pontos */}
@@ -391,7 +507,7 @@ export function RankingModal({
                       </div>
                       <div className="flex-1">
                         <h4 className="font-medium text-text-primary">{membro.nome}</h4>
-                        <p className="text-xs text-muted">{membro.funcao}</p>
+                        <p className="text-xs text-muted">{(membro as any).cargo || (membro as any).funcao || 'Desbravador'}</p>
                       </div>
                       <AppButton variant="secondary" size="sm">
                         Avaliar
@@ -520,6 +636,7 @@ export function RankingModal({
             </motion.div>
           )}
         </AnimatePresence>
+      )}
       </div>
 
       {/* Legenda */}
