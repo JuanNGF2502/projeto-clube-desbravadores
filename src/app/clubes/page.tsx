@@ -232,17 +232,13 @@ export default function ClubesPage() {
 
       {filteredClubes.length === 0 ? (
         <AppEmptyState
-          icon={Building2}
+          icon={<Building2 className="w-10 h-10" />}
           title="Nenhum clube encontrado"
           description={searchTerm ? 'Tente buscar com outros termos' : 'Cadastre o primeiro clube'}
-          action={
-            !searchTerm && (
-              <AppButton size="sm" onClick={() => handleOpenModal()}>
-                <Plus className="w-4 h-4 mr-1" />
-                Novo Clube
-              </AppButton>
-            )
-          }
+          action={!searchTerm ? {
+            label: 'Novo Clube',
+            onClick: () => handleOpenModal(),
+          } : undefined}
         />
       ) : (
         <div className="grid gap-4">

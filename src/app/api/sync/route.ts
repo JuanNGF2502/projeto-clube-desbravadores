@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+type SyncError = {
+  id: string;
+  error: string;
+};
+
+type SyncResultItem = {
+  synced: number;
+  created: number;
+  updated: number;
+  errors: SyncError[];
+};
+
+type SyncResults = {
+  membros: SyncResultItem;
+  unidades: SyncResultItem;
+  avaliacoes: SyncResultItem;
+  classes: SyncResultItem;
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -13,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results = {
+    const results: SyncResults = {
       membros: { synced: 0, created: 0, updated: 0, errors: [] },
       unidades: { synced: 0, created: 0, updated: 0, errors: [] },
       avaliacoes: { synced: 0, created: 0, updated: 0, errors: [] },
@@ -115,7 +134,6 @@ export async function POST(request: NextRequest) {
       supabase
         .from('avaliacoes')
         .select('*')
-        .eq('unidade_id')
         .in(
           'unidade_id',
           (await supabase.from('unidades').select('id').eq('clube_id', clubId)).data?.map((u) => u.id) || []

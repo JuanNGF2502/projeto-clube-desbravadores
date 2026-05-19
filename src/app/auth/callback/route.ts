@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { type CookieOptions } from '@supabase/ssr';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -8,49 +8,25 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/dashboard';
 
   if (code) {
+    const requestCookies = await cookies();
+    const cookieItems: Array<{ name: string; value: string; options: Record<string, any> }> = [];
+    let cookieHeaders: Record<string, string> = {};
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value;
+          getAll: async () => {
+            const allCookies = await requestCookies.getAll();
+            return allCookies.map((cookie) => ({
+              name: cookie.name,
+              value: cookie.value,
+            }));
           },
-          set(name: string, value: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value,
-              ...options,
-            });
-            const response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            });
-            response.cookies.set({
-              name,
-              value,
-              ...options,
-            });
-            return response;
-          },
-          remove(name: string, options: CookieOptions) {
-            request.cookies.set({
-              name,
-              value: '',
-              ...options,
-            });
-            const response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            });
-            response.cookies.set({
-              name,
-              value: '',
-              ...options,
-            });
-            return response;
+          setAll: async (cookiesToSet, headers) => {
+            cookieItems.push(...cookiesToSet);
+            cookieHeaders = headers;
           },
         },
       }
@@ -58,7 +34,14 @@ export async function GET(request: Request) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      const response = NextResponse.redirect(`${origin}${next}`);
+      cookieItems.forEach((cookie) => {
+        response.cookies.set(cookie.name, cookie.value, cookie.options);
+      });
+      Object.entries(cookieHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+      return response;
     }
   }
 
