@@ -104,12 +104,12 @@ export async function getMembros(clubeId: string, filters?: MembroFilters) {
   // Busca cargos dos membros
   const { data: membrosCargos } = await supabase
     .from('membros_cargos')
-    .select('*, cargo:cargos!cargo_tipo(*)')
+    .select('*, cargo:cargos(*)')
     .in('membro_id', membroIds);
 
   const { data: membrosClassesAtuais } = await supabase
     .from('membros_classes_atuais')
-    .select('*, classe:classes!classe_id(*)')
+    .select('*, classe:classes(*)')
     .in('membro_id', membroIds);
 
   // Relaciona os dados

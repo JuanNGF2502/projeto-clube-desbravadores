@@ -18,6 +18,7 @@ import { AppInput } from '@/components/ui/AppInput';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppEmptyState } from '@/components/ui/AppEmptyState';
 import { useToast } from '@/components/ui/Toast';
+import { supabase } from '@/lib/supabase';
 import { getMembros, getUnidades, createMembro, updateMembro, deleteMembro, createMembroCargo, createMembroClasseAtual, createMembroUnidade, deleteMembroCargos, deleteMembroClassesAtuais, getClasses, getCargos, syncProfileFromMembro } from '@/lib/queries';
 import { Unit, CargoTipo, DEFAULT_CLASSES } from '@/types';
 import { useClubId } from '@/hooks';
@@ -169,59 +170,64 @@ export default function MembrosPage() {
         observacoes: dados.observacoes || null,
       };
 
+      const salvarCargos = async (membroId: string) => {
+        if (!dados.cargos?.length) return;
+        for (const cargo of dados.cargos) {
+          const cargoTipo = typeof cargo === 'string' ? cargo : cargo.tipo;
+          const cargoUnidadeId = typeof cargo === 'object'
+            ? (cargo.unidadeId || membroUnidadeId)
+            : membroUnidadeId;
+          const cargoClasseId = typeof cargo === 'object' ? cargo.classeId || null : null;
+          try {
+            await createMembroCargo(membroId, cargoTipo, cargoUnidadeId, cargoClasseId);
+          } catch (err: any) {
+            console.error(`Erro ao salvar cargo ${cargoTipo}:`, err);
+          }
+        }
+      };
+
+      const salvarClasses = async (membroId: string) => {
+        if (!dados.classesAtuais?.length) return;
+        for (const classe of dados.classesAtuais) {
+          const classeId = typeof classe === 'string' ? classe : classe.classeId;
+          try {
+            await createMembroClasseAtual(membroId, classeId);
+          } catch (err: any) {
+            console.error(`Erro ao salvar classe ${classeId}:`, err);
+          }
+        }
+      };
+
       if (editandoMembro) {
         await updateMembro(editandoMembro.id, membroData);
 
-        await deleteMembroCargos(editandoMembro.id);
-        if (dados.cargos && dados.cargos.length > 0) {
-          for (const cargo of dados.cargos) {
-            const cargoTipo = typeof cargo === 'string' ? cargo : cargo.tipo;
-            const cargoUnidadeId = typeof cargo === 'object'
-              ? (cargo.unidadeId || membroUnidadeId)
-              : membroUnidadeId;
-            const cargoClasseId = typeof cargo === 'object' ? cargo.classeId || null : null;
-            await createMembroCargo(editandoMembro.id, cargoTipo, cargoUnidadeId, cargoClasseId);
-          }
-        }
+        try { await deleteMembroCargos(editandoMembro.id); } catch (err: any) { console.error('Erro ao limpar cargos:', err); }
+        await salvarCargos(editandoMembro.id);
 
-        await deleteMembroClassesAtuais(editandoMembro.id);
-        if (dados.classesAtuais && dados.classesAtuais.length > 0) {
-          for (const classe of dados.classesAtuais) {
-            const classeId = typeof classe === 'string' ? classe : classe.classeId;
-            await createMembroClasseAtual(editandoMembro.id, classeId);
-          }
-        }
+        try { await deleteMembroClassesAtuais(editandoMembro.id); } catch (err: any) { console.error('Erro ao limpar classes:', err); }
+        await salvarClasses(editandoMembro.id);
 
-        // Sync profile if member has a linked user
-        await syncProfileFromMembro(editandoMembro.id);
+        try { await syncProfileFromMembro(editandoMembro.id); } catch (err: any) { console.error('Erro ao sync profile:', err); }
 
         addToast({ type: 'success', title: 'Sucesso', message: 'Membro atualizado' });
       } else {
-        const novoMembro = await createMembro({
-          ...membroData,
-          clube_id: CLUB_ID,
-        });
+        const { data: novoMembro, error: createError } = await supabase
+          .from('membros')
+          .insert({ ...membroData, clube_id: CLUB_ID })
+          .select()
+          .single();
 
-        if (dados.cargos && dados.cargos.length > 0) {
-          for (const cargo of dados.cargos) {
-            const cargoTipo = typeof cargo === 'string' ? cargo : cargo.tipo;
-            const cargoUnidadeId = typeof cargo === 'object'
-              ? (cargo.unidadeId || membroUnidadeId)
-              : membroUnidadeId;
-            const cargoClasseId = typeof cargo === 'object' ? cargo.classeId || null : null;
-            await createMembroCargo(novoMembro.id, cargoTipo, cargoUnidadeId, cargoClasseId);
-          }
+        if (createError) {
+          console.error('Erro ao criar membro:', createError);
+          addToast({ type: 'error', title: 'Erro', message: `Falha ao criar: ${createError.message}` });
+          return;
         }
 
-        if (dados.classesAtuais && dados.classesAtuais.length > 0) {
-          for (const classe of dados.classesAtuais) {
-            const classeId = typeof classe === 'string' ? classe : classe.classeId;
-            await createMembroClasseAtual(novoMembro.id, classeId);
-          }
-        }
+        await salvarCargos(novoMembro.id);
+        await salvarClasses(novoMembro.id);
 
         if (membroUnidadeId) {
-          await createMembroUnidade(novoMembro.id, membroUnidadeId);
+          try { await createMembroUnidade(novoMembro.id, membroUnidadeId); } catch (err: any) { console.error('Erro ao salvar historico unidade:', err); }
         }
 
         addToast({ type: 'success', title: 'Sucesso', message: 'Membro criado' });
@@ -229,9 +235,9 @@ export default function MembrosPage() {
       await carregarDados();
       setShowForm(false);
       setEditandoMembro(null);
-    } catch (error) {
-      console.error('Erro ao salvar membro:', error);
-      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar membro' });
+    } catch (error: any) {
+      console.error('Erro inesperado ao salvar membro:', error);
+      addToast({ type: 'error', title: 'Erro', message: error?.message || 'Falha ao salvar membro' });
     } finally {
       setIsSaving(false);
     }
