@@ -2,10 +2,10 @@
 // TIPOS DE CARGO (EXPANSÍVEIS)
 // ==========================================
 
-export type CategoriaMembro = 'ADMIN' | 'DIRIGENTE' | 'LIDER' | 'DESBRAVADOR';
+export type CategoriaMembro = 'ADMIN' | 'LIDER' | 'DESBRAVADOR';
 
 export type CargoTipo =
-  // Cargos de Admin/Dirigente
+  // Cargos de Admin
   | 'ADMIN'
   | 'REGIONAL'
   | 'DIRETOR'
@@ -64,7 +64,7 @@ export const CARGOS: Cargo[] = [
     categoria: 'ADMIN',
   },
 
-  // Dirigente
+  // Líder
   {
     tipo: 'DIRETOR',
     nome: 'Diretor do Clube',
@@ -72,7 +72,7 @@ export const CARGOS: Cargo[] = [
     cor: '#2563EB',
     podeTerMultiple: false,
     requerUnidade: false,
-    categoria: 'DIRIGENTE',
+    categoria: 'LIDER',
   },
   {
     tipo: 'DIRETOR_ASSOC',
@@ -81,7 +81,7 @@ export const CARGOS: Cargo[] = [
     cor: '#0891B2',
     podeTerMultiple: true,
     requerUnidade: false,
-    categoria: 'DIRIGENTE',
+    categoria: 'LIDER',
   },
 
   // Líder

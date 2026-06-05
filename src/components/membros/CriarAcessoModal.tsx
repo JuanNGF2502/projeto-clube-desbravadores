@@ -7,7 +7,7 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
 import { AppSelect } from '@/components/ui/AppSelect';
 import { useToast } from '@/components/ui/Toast';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 
 interface CriarAcessoModalProps {
   isOpen: boolean;
@@ -179,7 +179,6 @@ export function CriarAcessoModal({
               options={[
                 { value: 'DESBRAVADOR', label: 'Desbravador' },
                 { value: 'LIDER', label: 'Líder' },
-                { value: 'DIRIGENTE', label: 'Dirigente' },
                 { value: 'ADMIN', label: 'Administrador' },
               ]}
             />

@@ -88,7 +88,7 @@ export function MembroFormModal({
       if (cargosAtivos.length > 0) {
         const temCargoLider = cargosAtivos.some(c => {
           const info = getCargoByTipo(c.tipo);
-          return info?.categoria === 'LIDER' || info?.categoria === 'DIRIGENTE';
+          return info?.categoria === 'LIDER';
         });
         categoria = temCargoLider ? 'LIDER' : 'DESBRAVADOR';
       } else if (usuario.classesAtuais && usuario.classesAtuais.length > 0) {
@@ -401,7 +401,7 @@ export function MembroFormModal({
                   <Shield className="w-7 h-7 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-text-primary">Líder / Dirigente</h4>
+                  <h4 className="font-bold text-text-primary">Líder</h4>
                   <p className="text-sm text-muted">Adulto voluntário</p>
                 </div>
                 {formData.categoriaMembro === 'LIDER' && (

@@ -5,7 +5,7 @@ import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useAppStore } from '@/stores/appStore';
 
-export type UserRole = 'ADMIN' | 'DIRIGENTE' | 'LIDER' | 'DESBRAVADOR';
+export type UserRole = 'ADMIN' | 'LIDER' | 'DESBRAVADOR';
 
 export interface Profile {
   id: string;
@@ -31,7 +31,6 @@ interface AuthContextType {
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
   hasRole: (roles: UserRole[]) => boolean;
   isAdmin: boolean;
-  isDirigente: boolean;
   isLider: boolean;
 }
 
@@ -265,8 +264,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Helpers
   const isAdmin = hasRole(['ADMIN']);
-  const isDirigente = hasRole(['ADMIN', 'DIRIGENTE']);
-  const isLider = hasRole(['ADMIN', 'DIRIGENTE', 'LIDER']);
+  const isLider = hasRole(['ADMIN', 'LIDER']);
 
   const value: AuthContextType = {
     user,
@@ -280,7 +278,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     updateProfile,
     hasRole,
     isAdmin,
-    isDirigente,
     isLider,
   };
 

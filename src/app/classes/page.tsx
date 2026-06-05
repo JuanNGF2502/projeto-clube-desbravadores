@@ -129,8 +129,8 @@ export default function ClassesPage() {
 
   const { user, profile } = useAuth();
 
-  const isInstrutorMode = profile?.role === 'ADMIN' || profile?.role === 'DIRIGENTE' || classesQueInstrui.length > 0;
-  const showAllClasses = profile?.role === 'ADMIN' || profile?.role === 'DIRIGENTE' || classesQueInstrui.length === 0;
+  const isInstrutorMode = profile?.role === 'ADMIN' || classesQueInstrui.length > 0;
+  const showAllClasses = profile?.role === 'ADMIN' || classesQueInstrui.length === 0;
 
   const carregarDados = async () => {
     try {
@@ -216,7 +216,7 @@ export default function ClassesPage() {
 
   useEffect(() => {
     if (user && profile) {
-      if (profile.role !== 'ADMIN' && profile.role !== 'DIRIGENTE') {
+      if (profile.role !== 'ADMIN') {
         Promise.all([
           getClassesQueInstrutorEnsina(user.id),
           profile.membro_id ? getClassesQueInstrutorEnsinaPorCargo(profile.membro_id) : Promise.resolve([]),

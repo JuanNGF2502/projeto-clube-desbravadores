@@ -12,7 +12,7 @@ import { AppModal } from '@/components/ui/AppModal';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppEmptyState } from '@/components/ui/AppEmptyState';
 import { useToast } from '@/components/ui/Toast';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 import { SPECIALTY_CATEGORIES, type EspecialidadeCategoria } from '@/types';
 import { cn } from '@/utils/cn';
 

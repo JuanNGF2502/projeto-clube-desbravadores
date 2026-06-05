@@ -22,7 +22,7 @@ import {
   deleteUnidade,
   toggleUnidadeAtivo
 } from '@/lib/queries';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 import { useClubId } from '@/hooks';
 
 interface UnitFormData {

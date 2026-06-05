@@ -87,34 +87,34 @@ export default function UnitsPage() {
     buscarRanking();
   }, []);
 
-  useEffect(() => {
-    if (user && profile) {
-      if (profile.role !== 'ADMIN' && profile.role !== 'DIRIGENTE' && profile.membro_id) {
-        getUnidadesQueConselheiroOrienta(profile.membro_id).then(ids => {
-          setUnidadesQueOrienta(ids);
-        }).catch(() => {
-          setUnidadesQueOrienta([]);
-        });
-      } else {
-        setUnidadesQueOrienta([]);
-      }
-    }
-  }, [user, profile]);
+  const podeGerenciarUnidades = profile?.role === 'ADMIN';
 
-  const showAllUnits = profile?.role === 'ADMIN' || profile?.role === 'DIRIGENTE' || unidadesQueOrienta.length === 0;
+  useEffect(() => {
+    if (!user || !profile) return;
+
+    if (podeGerenciarUnidades) {
+      setUnidadesQueOrienta([]);
+      return;
+    }
+
+    if (profile.membro_id) {
+      getUnidadesQueConselheiroOrienta(profile.membro_id).then(ids => {
+        setUnidadesQueOrienta(ids);
+      }).catch(() => {
+        setUnidadesQueOrienta([]);
+      });
+    }
+  }, [user, profile, podeGerenciarUnidades]);
 
   const filteredUnits = useMemo(() => {
-    let result = units;
-    if (!showAllUnits && unidadesQueOrienta.length > 0) {
-      result = result.filter(u => unidadesQueOrienta.includes(u.id));
-    }
+    let result = podeGerenciarUnidades ? units : units.filter(u => unidadesQueOrienta.includes(u.id));
     if (search) {
       result = result.filter((unit) =>
         unit.nome.toLowerCase().includes(search.toLowerCase())
       );
     }
     return result;
-  }, [units, search, unidadesQueOrienta, showAllUnits]);
+  }, [units, search, unidadesQueOrienta, podeGerenciarUnidades]);
 
   const handleSave = async () => {
     if (!formData.nome.trim()) {
@@ -204,12 +204,12 @@ export default function UnitsPage() {
     );
   }
 
-  const canManageUnits = profile?.role === 'ADMIN' || profile?.role === 'DIRIGENTE';
+  const canManageUnits = profile?.role === 'ADMIN' || profile?.role === 'LIDER';
 
   return (
     <AppLayout
       title="Unidades"
-      subtitle={`${filteredUnits.length}${!showAllUnits ? ` de ${units.length}` : ''} unidades`}
+      subtitle={`${filteredUnits.length}${!podeGerenciarUnidades ? ` de ${units.length}` : ''} unidades`}
       actions={
         canManageUnits ? (
           <AppButton variant="primary" size="sm" onClick={openCreateModal}>
@@ -219,7 +219,7 @@ export default function UnitsPage() {
         ) : undefined
       }
     >
-      {!showAllUnits && unidadesQueOrienta.length > 0 && (
+      {!podeGerenciarUnidades && unidadesQueOrienta.length > 0 && (
         <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
           <div className="p-2 rounded-lg bg-primary/20">
             <Users className="w-5 h-5 text-primary" />

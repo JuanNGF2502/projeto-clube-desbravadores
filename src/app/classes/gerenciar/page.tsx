@@ -10,7 +10,7 @@ import { AppInput } from '@/components/ui/AppInput';
 import { AppTextarea } from '@/components/ui/AppInput';
 import { AppModal } from '@/components/ui/AppModal';
 import { useToast } from '@/components/ui/Toast';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 import { DEFAULT_CLASSES } from '@/types';
 
 interface Requisito {

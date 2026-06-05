@@ -16,7 +16,7 @@ import { useTheme } from "@/providers/ThemeProvider";
 import { useAuth, Profile } from "@/hooks";
 import { cn } from "@/utils/cn";
 import { Unit, UNIT_GENDERS, DEFAULT_UNIT_COLORS } from "@/types";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { getTodasUnidades, createUnidade, updateUnidade, deleteUnidade } from '@/lib/queries';
 import { useClubId } from '@/hooks';
 
@@ -161,7 +161,6 @@ export default function ProfilePage() {
   const getRoleLabel = (role?: string) => {
     switch (role) {
       case 'ADMIN': return 'Administrador';
-      case 'DIRIGENTE': return 'Dirigente';
       case 'LIDER': return 'Líder';
       default: return 'Desbravador';
     }

@@ -9,7 +9,7 @@ import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse } from '@/lib/queries';
 import { DEFAULT_CLASSES } from '@/types';
-import { useClubId } from '@/hooks';
+import { useClubId, useAuth } from '@/hooks';
 
 interface RankingUnidade {
   id: string;
@@ -22,6 +22,7 @@ interface RankingUnidade {
 
 export default function DashboardPage() {
   const clubId = useClubId();
+  const { profile } = useAuth();
 
   const [estatisticas, setEstatisticas] = useState({
     totalMembros: 0,
@@ -101,7 +102,7 @@ export default function DashboardPage() {
           <AppCard className="relative overflow-hidden">
             <div className="relative z-10">
               <p className="text-sm text-muted mb-1">Bem-vindo de volta,</p>
-              <h2 className="text-2xl font-bold text-text-primary mb-1">Conselheiro</h2>
+              <h2 className="text-2xl font-bold text-text-primary mb-1">{profile?.nome || 'Conselheiro'}</h2>
               <p className="text-sm text-muted">Continue o excelente trabalho!</p>
             </div>
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-primary/20 rounded-full blur-3xl" />

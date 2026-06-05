@@ -9,7 +9,7 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppSelect } from '@/components/ui/AppSelect';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth, UserRole } from '@/hooks';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -185,7 +185,6 @@ export default function LoginPage() {
   const roleOptions = [
     { value: 'DESBRAVADOR', label: 'Desbravador' },
     { value: 'LIDER', label: 'Líder' },
-    { value: 'DIRIGENTE', label: 'Dirigente' },
     { value: 'ADMIN', label: 'Administrador' },
   ];
 

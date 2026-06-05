@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Building2, ChevronDown, Loader2 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 
 interface ClubeData {
   id: string;
