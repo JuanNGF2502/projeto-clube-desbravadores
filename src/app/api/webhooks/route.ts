@@ -7,7 +7,7 @@ const webhooks: Map<string, string> = new Map();
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { event, url, secret } = body;
+    const { event, url } = body;
 
     if (!event || !url) {
       return NextResponse.json(

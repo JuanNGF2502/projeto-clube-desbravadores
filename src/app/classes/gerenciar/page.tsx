@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Pencil, Trash2, BookOpen, Loader2, ChevronDown, ChevronRight, Save, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, BookOpen, Loader2, ChevronDown, ChevronRight, Save } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
 import { AppTextarea } from '@/components/ui/AppInput';
 import { AppModal } from '@/components/ui/AppModal';
-import { AppBadge } from '@/components/ui/AppBadge';
-import { AppEmptyState } from '@/components/ui/AppEmptyState';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_CLASSES } from '@/types';

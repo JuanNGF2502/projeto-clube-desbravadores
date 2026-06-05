@@ -102,7 +102,8 @@ export async function getAvaliacoesPorMembro(membroId: string, limite: number = 
     .from('avaliacoes')
     .select(`
       *,
-      unidade:unidades(nome)
+      unidade:unidades(nome),
+      criterio:criterios_avaliacao(nome)
     `)
     .eq('membro_id', membroId)
     .order('data', { ascending: false })
@@ -119,7 +120,8 @@ export async function getAvaliacoesPorUnidadeData(unidadeId: string, dataAvaliac
     .from('avaliacoes')
     .select(`
       *,
-      membro:membros(id, nome, foto)
+      membro:membros(id, nome, foto),
+      criterio:criterios_avaliacao(nome)
     `)
     .eq('unidade_id', unidadeId)
     .eq('data', dataRef);
@@ -134,7 +136,8 @@ export async function getHistoricoAvaliacoesMembro(membroId: string) {
     .from('avaliacoes')
     .select(`
       *,
-      unidade:unidades(nome)
+      unidade:unidades(nome),
+      criterio:criterios_avaliacao(nome)
     `)
     .eq('membro_id', membroId)
     .order('data', { ascending: false });

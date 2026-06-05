@@ -19,7 +19,7 @@ import { AppCard } from '@/components/ui/AppCard';
 import { AppEmptyState } from '@/components/ui/AppEmptyState';
 import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase';
-import { getMembros, getUnidades, createMembro, updateMembro, deleteMembro, createMembroCargo, createMembroClasseAtual, createMembroUnidade, deleteMembroCargos, deleteMembroClassesAtuais, getClasses, getCargos, syncProfileFromMembro } from '@/lib/queries';
+import { getMembros, getUnidades, updateMembro, createMembroCargo, createMembroClasseAtual, createMembroUnidade, deleteMembroCargos, deleteMembroClassesAtuais, syncProfileFromMembro } from '@/lib/queries';
 import { Unit, CargoTipo, DEFAULT_CLASSES } from '@/types';
 import { useClubId } from '@/hooks';
 

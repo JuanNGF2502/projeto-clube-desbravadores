@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Usuario, Unit, CargoTipo } from '@/types';
+import { Unit, CargoTipo } from '@/types';
 
 // ============================================
 // CLUBES
@@ -165,7 +165,7 @@ export async function createMembro(membro: {
   return data;
 }
 
-export async function updateMembro(id: string, membro: Partial<Usuario>) {
+export async function updateMembro(id: string, membro: Record<string, any>) {
   const { data, error } = await supabase
     .from('membros')
     .update(membro)

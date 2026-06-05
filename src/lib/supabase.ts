@@ -8,12 +8,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Supabase configuration missing');
 }
 
-// Options for Supabase client
 export const supabaseOptions = {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true,
   },
 };
 

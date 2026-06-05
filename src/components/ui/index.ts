@@ -13,3 +13,6 @@ export { AppTable } from './AppTable';
 export { ToastProvider, useToast } from './Toast';
 export { ColorPicker } from './ColorPicker';
 export { ThemeToggle } from './ThemeToggle';
+export { ProgressCircle } from './ProgressCircle';
+export { EvolutionChart } from './EvolutionChart';
+export { ClubeSelector } from './ClubeSelector';

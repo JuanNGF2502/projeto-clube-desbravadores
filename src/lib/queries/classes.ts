@@ -288,10 +288,6 @@ export async function getMembrosComProgresso(clubeId: string, classeId: string):
   return membrosComProgresso;
 }
 
-// ============================================
-// ESPECIALIDADES
-// ============================================
-
 export interface EspecialidadeDB {
   id: string;
   nome: string;
@@ -299,23 +295,6 @@ export interface EspecialidadeDB {
   descricao?: string;
   nivel: number;
   imagem?: string;
-}
-
-export async function getEspecialidades(categoria?: string): Promise<EspecialidadeDB[]> {
-  let query = supabase
-    .from('especialidades')
-    .select('*')
-    .eq('ativo', true)
-    .order('nome');
-
-  if (categoria) {
-    query = query.eq('categoria', categoria);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return data || [];
 }
 
 export async function getEspecialidadesPorCategoria(): Promise<Record<string, EspecialidadeDB[]>> {

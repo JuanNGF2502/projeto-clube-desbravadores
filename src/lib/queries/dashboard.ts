@@ -188,7 +188,7 @@ export interface MembrosPorClasse {
   count: number;
 }
 
-export async function getMembrosPorClasse(clubeId: string): Promise<MembrosPorClasse[]> {
+export async function getMembrosPorClasse(_clubeId: string): Promise<MembrosPorClasse[]> {
   // Buscar classes
   const { data: classes } = await supabase
     .from('classes')
@@ -251,7 +251,8 @@ export async function getAvaliacoesDaUnidade(unidadeId: string, dataAvaliacao?: 
     .from('avaliacoes')
     .select(`
       *,
-      membro:membros(nome)
+      membro:membros(nome),
+      criterio:criterios_avaliacao(nome)
     `)
     .eq('unidade_id', unidadeId)
     .eq('data', dataRef);
@@ -266,7 +267,7 @@ export async function getAvaliacoesDaUnidade(unidadeId: string, dataAvaliacao?: 
     unidade_id: a.unidade_id,
     data: a.data,
     criterio_id: a.criterio_id,
-    criterio_nome: a.criterio_id, // Pode ser melhorado com JOIN para tabela de critérios
+    criterio_nome: a.criterio?.nome || a.criterio_id,
     nivel: a.nivel,
     pontos: a.pontos,
     observacao: a.observacao,
@@ -278,7 +279,8 @@ export async function getAvaliacoesDoMembro(membroId: string, limite: number = 1
     .from('avaliacoes')
     .select(`
       *,
-      membro:membros(nome)
+      membro:membros(nome),
+      criterio:criterios_avaliacao(nome)
     `)
     .eq('membro_id', membroId)
     .order('data', { ascending: false })
@@ -294,7 +296,7 @@ export async function getAvaliacoesDoMembro(membroId: string, limite: number = 1
     unidade_id: a.unidade_id,
     data: a.data,
     criterio_id: a.criterio_id,
-    criterio_nome: a.criterio_id,
+    criterio_nome: a.criterio?.nome || a.criterio_id,
     nivel: a.nivel,
     pontos: a.pontos,
     observacao: a.observacao,

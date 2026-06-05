@@ -42,7 +42,6 @@ export {
   getRequisitosPorClasse,
   getEstatisticasClasse,
   getMembrosComProgresso,
-  getEspecialidades as getEspecialidadesFromClasses,
   getEspecialidadesPorCategoria,
   updateProgressoRequisito,
   // Controle de instrução
