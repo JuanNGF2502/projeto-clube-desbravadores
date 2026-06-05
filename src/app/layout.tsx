@@ -63,10 +63,16 @@ export default function RootLayout({
   // Script to prevent flash of wrong theme
   const themeScript = `
     (function() {
-      const stored = localStorage.getItem('theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = stored || (prefersDark ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
+      var theme = 'dark';
+      try { var stored = localStorage.getItem('theme'); if (stored) theme = stored; } catch(e) {}
+      if (theme === 'dark' || theme === 'light') {
+        document.documentElement.setAttribute('data-theme', theme);
+      } else {
+        try {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch(e) {}
+      }
     })();
   `;
 

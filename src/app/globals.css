@@ -144,6 +144,12 @@ body {
   background: var(--scrollbar-hover);
 }
 
+/* iOS safe viewport height */
+@utility min-h-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
 /* Selection */
 ::selection {
   background: rgba(198, 161, 91, 0.3);

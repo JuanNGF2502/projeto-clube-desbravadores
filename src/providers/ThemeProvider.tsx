@@ -24,27 +24,32 @@ interface Props {
   children: ReactNode;
 }
 
+function getInitialTheme(): Theme {
+  try {
+    const stored = localStorage.getItem('theme') as Theme | null;
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {}
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch {}
+  return 'dark';
+}
+
 export function ThemeProvider({ children }: Props) {
   const [theme, setThemeState] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Check localStorage first
-    const stored = localStorage.getItem('theme') as Theme | null;
-    if (stored) {
-      setThemeState(stored);
-    } else {
-      // Check system preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setThemeState(prefersDark ? 'dark' : 'light');
-    }
+    setThemeState(getInitialTheme());
     setMounted(true);
   }, []);
 
   useEffect(() => {
     if (mounted) {
       document.documentElement.setAttribute('data-theme', theme);
-      localStorage.setItem('theme', theme);
+      try {
+        localStorage.setItem('theme', theme);
+      } catch {}
     }
   }, [theme, mounted]);
 
@@ -55,11 +60,6 @@ export function ThemeProvider({ children }: Props) {
   const toggleTheme = () => {
     setThemeState(theme === 'dark' ? 'light' : 'dark');
   };
-
-  // Prevent flash of wrong theme
-  if (!mounted) {
-    return <div className="min-h-screen bg-[#09090B]" />;
-  }
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
