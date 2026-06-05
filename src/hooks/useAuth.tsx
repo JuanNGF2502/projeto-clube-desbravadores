@@ -57,8 +57,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setSession(currentSession);
           setUser(currentSession.user);
 
-          // Buscar profile
-          await fetchProfile(currentSession.user.id);
+          fetchProfile(currentSession.user.id);
         }
       } catch (error) {
         console.error('Erro ao carregar sessão:', error);
@@ -76,7 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(currentSession?.user || null);
 
         if (currentSession?.user) {
-          await fetchProfile(currentSession.user.id);
+          fetchProfile(currentSession.user.id);
         } else {
           setProfile(null);
         }
@@ -207,7 +206,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (data?.user?.id) {
-        await fetchProfile(data.user.id);
+        fetchProfile(data.user.id);
       }
 
       return { error: null };
