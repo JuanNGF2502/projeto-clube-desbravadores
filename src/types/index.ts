@@ -365,6 +365,15 @@ export const DEFAULT_CLASSES: Classe[] = [
     classesPreRequisito: ['5'],
     imagem: '/images/guia-150x150.png',
   },
+  {
+    id: '7',
+    nome: 'Agrupadas',
+    descricao: 'Classes avançadas agrupadas com requisitos por faixa etária',
+    ordem: 7,
+    cor: '#06B6D4',
+    classesPreRequisito: ['6'],
+    imagem: '/images/agrupadas-150x150.png',
+  },
 ];
 
 export const getClasseById = (id: string): Classe | undefined =>

@@ -21,6 +21,7 @@ export interface AvaliacaoInput {
   nivel: 'A' | 'B' | 'C';
   pontos: number;
   observacao?: string;
+  sessao_id?: string;
 }
 
 // ============================================
@@ -83,9 +84,14 @@ export async function criarAvaliacao(avaliacao: AvaliacaoInput) {
 
 export async function criarAvaliacoesBatch(avaliacoes: AvaliacaoInput[]) {
   const dados = avaliacoes.map(a => ({
-    ...a,
+    membro_id: a.membro_id,
+    unidade_id: a.unidade_id,
+    criterio_id: a.criterio_id,
+    nivel: a.nivel,
+    pontos: a.pontos,
     data: new Date().toISOString().split('T')[0],
     observacao: a.observacao || null,
+    sessao_id: a.sessao_id || null,
   }));
 
   const { data, error } = await supabase

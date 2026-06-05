@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
-import { Save, Loader2, Check, X, Calendar, Trophy, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Save, Loader2, Check, X, Calendar, Trophy, Users, ChevronDown, ChevronUp, Lock, Clock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -12,6 +12,7 @@ import { AppSelect, type SelectOption } from '@/components/ui/AppSelect';
 import { useToast } from '@/components/ui/Toast';
 import { getUnidadeById, getMembrosPorUnidade } from '@/lib/queries';
 import { getCriteriosAvaliacao, criarAvaliacoesBatch, getAvaliacoesPorUnidadeData, CriterioAvaliacaoDB } from '@/lib/queries/avaliacoes';
+import { getSessaoAtiva } from '@/lib/queries/sessoes-avaliacao';
 
 interface Membro {
   id: string;
@@ -35,6 +36,7 @@ interface Params {
 export default function AvaliacoesPage({ params }: { params: Promise<Params> }) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { addToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -46,33 +48,48 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
   const [dataAvaliacao, setDataAvaliacao] = useState(new Date().toISOString().split('T')[0]);
   const [expandedMembros, setExpandedMembros] = useState<Set<string>>(new Set());
   const [avaliacoesAnteriores, setAvaliacoesAnteriores] = useState<any[]>([]);
+  const [sessaoId, setSessaoId] = useState<string | null>(null);
+  const [dataBloqueada, setDataBloqueada] = useState(false);
 
-  const carregarDados = async () => {
-    try {
-      setIsLoading(true);
-
-      // Buscar unidade
-      const unidadeData = await getUnidadeById(resolvedParams.id);
-      if (!unidadeData) {
-        addToast({ type: 'error', title: 'Erro', message: 'Unidade não encontrada' });
-        router.push('/unidades');
-        return;
+  // Carregar sessão uma vez no mount
+  useEffect(() => {
+    const carregarSessao = async () => {
+      const sessaoParam = searchParams.get('sessao');
+      if (sessaoParam) {
+        setSessaoId(sessaoParam);
+        const { supabase } = await import('@/lib/supabase/client');
+        const { data: sessao } = await supabase
+          .from('sessoes_avaliacao')
+          .select('data_reuniao')
+          .eq('id', sessaoParam)
+          .single();
+        if (sessao) {
+          setDataAvaliacao(sessao.data_reuniao);
+          setDataBloqueada(true);
+        }
+      } else {
+        const ativa = await getSessaoAtiva(resolvedParams.id);
+        if (ativa) {
+          setSessaoId(ativa.id);
+          setDataAvaliacao(ativa.data_reuniao);
+          setDataBloqueada(true);
+        }
       }
-      setUnidade(unidadeData);
+    };
+    carregarSessao();
+  }, [resolvedParams.id, searchParams]);
 
-      // Buscar membros
-      const membrosData = await getMembrosPorUnidade(resolvedParams.id);
+  const carregarAvaliacoes = useCallback(async (data: string) => {
+    try {
+      const [membrosData, criteriosData, avaliacoesData] = await Promise.all([
+        getMembrosPorUnidade(resolvedParams.id),
+        getCriteriosAvaliacao(true),
+        getAvaliacoesPorUnidadeData(resolvedParams.id, data),
+      ]);
       setMembros(membrosData || []);
-
-      // Buscar critérios
-      const criteriosData = await getCriteriosAvaliacao(true);
       setCriterios(criteriosData);
-
-      // Buscar avaliações do dia
-      const avaliacoesData = await getAvaliacoesPorUnidadeData(resolvedParams.id, dataAvaliacao);
       setAvaliacoesAnteriores(avaliacoesData);
 
-      // Montar mapa de avaliações existentes
       const avaliacoesMap: Record<string, Record<string, { nivel: 'A' | 'B' | 'C'; pontos: number }>> = {};
       (avaliacoesData || []).forEach((av: any) => {
         if (!avaliacoesMap[av.membro_id]) {
@@ -84,7 +101,23 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
         };
       });
       setAvaliacoes(avaliacoesMap);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar dados' });
+    }
+  }, [resolvedParams.id, addToast]);
 
+  const carregarDados = async () => {
+    try {
+      setIsLoading(true);
+      const unidadeData = await getUnidadeById(resolvedParams.id);
+      if (!unidadeData) {
+        addToast({ type: 'error', title: 'Erro', message: 'Unidade não encontrada' });
+        router.push('/unidades');
+        return;
+      }
+      setUnidade(unidadeData);
+      await carregarAvaliacoes(dataAvaliacao);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar dados' });
@@ -95,7 +128,13 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
 
   useEffect(() => {
     carregarDados();
-  }, [resolvedParams.id, dataAvaliacao]);
+  }, [resolvedParams.id]);
+
+  useEffect(() => {
+    if (!isLoading && unidade) {
+      carregarAvaliacoes(dataAvaliacao);
+    }
+  }, [dataAvaliacao]);
 
   const getPontosPorNivel = (criterio: CriterioAvaliacaoDB, nivel: 'A' | 'B' | 'C'): number => {
     if (nivel === 'A') return criterio.pontos_a;
@@ -144,6 +183,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
             criterio_id: criterioId,
             nivel: av.nivel,
             pontos: av.pontos,
+            sessao_id: sessaoId || undefined,
           });
         });
       });
@@ -239,12 +279,20 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
                 <p className="text-xs text-muted">{new Date(dataAvaliacao).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
               </div>
             </div>
-            <input
-              type="date"
-              value={dataAvaliacao}
-              onChange={(e) => setDataAvaliacao(e.target.value)}
-              className="p-2 rounded-lg border border-border bg-card text-text-primary text-sm"
-            />
+            <div className="flex items-center gap-2">
+              {dataBloqueada && (
+                <span title="Data definida pela sessão">
+                  <Lock className="w-4 h-4 text-muted" />
+                </span>
+              )}
+              <input
+                type="date"
+                value={dataAvaliacao}
+                onChange={(e) => setDataAvaliacao(e.target.value)}
+                disabled={dataBloqueada}
+                className={`p-2 rounded-lg border border-border bg-card text-text-primary text-sm ${dataBloqueada ? 'opacity-60 cursor-not-allowed' : ''}`}
+              />
+            </div>
           </div>
         </AppCard>
 

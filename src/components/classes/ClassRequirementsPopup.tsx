@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, RotateCcw, GraduationCap, UserCheck, BookOpen, Loader2 } from 'lucide-react';
+import { Check, RotateCcw, GraduationCap, UserCheck, BookOpen, Loader2, Trophy } from 'lucide-react';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppButton } from '@/components/ui/AppButton';
@@ -65,6 +65,7 @@ interface ClassRequirementsPopupProps {
     ensinados: number;
     percentage: number;
   };
+  onConcluirClasse?: (memberId: string) => Promise<void>;
 }
 
 const areaIcons: Record<string, string> = {
@@ -83,6 +84,7 @@ export function ClassRequirementsPopup({
   modoInstrutor = false,
   onSalvarInstrucao,
   instrucaoProgress,
+  onConcluirClasse,
 }: ClassRequirementsPopupProps) {
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
@@ -378,7 +380,7 @@ export function ClassRequirementsPopup({
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium" style={{ color: 'var(--text-color)' }}>{initialProgress.className}</p>
-              <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Classe {initialProgress.classId} de 6</p>
+              <p className="text-sm" style={{ color: 'var(--text-secondary-color)' }}>Classe {initialProgress.classId} de {DEFAULT_CLASSES.length}</p>
             </div>
             <AppBadge
               variant={progressPercentage === 100 ? 'success' : 'primary'}
@@ -443,6 +445,33 @@ export function ClassRequirementsPopup({
             </>
           )}
         </div>
+
+        {/* Concluir Classe Button */}
+        {!modoInstrutor && progressPercentage === 100 && completedCount === totalReqs && onConcluirClasse && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-success/10 border border-success/30"
+          >
+            <Trophy className="w-8 h-8 text-success" />
+            <p className="text-sm font-semibold text-success text-center">
+              Todos os requisitos foram concluídos!
+            </p>
+            <AppButton
+              onClick={async () => {
+                if (initialProgress && 'memberId' in initialProgress) {
+                  await onConcluirClasse(initialProgress.memberId);
+                  onClose();
+                }
+              }}
+              variant="primary"
+              className="mt-1"
+            >
+              <Trophy className="w-4 h-4 mr-1" />
+              Concluir Classe
+            </AppButton>
+          </motion.div>
+        )}
 
         {/* Areas Horizontal Scroll */}
         <div>

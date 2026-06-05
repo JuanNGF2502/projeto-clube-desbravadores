@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Pencil, Trash2, Award, Loader2, Save, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Award, Loader2, Save, UserPlus, X, Check, Users } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -15,6 +15,8 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase/client';
 import { SPECIALTY_CATEGORIES, type EspecialidadeCategoria } from '@/types';
 import { cn } from '@/utils/cn';
+import { getMembrosDisponiveis, getMembrosPorEspecialidade, atribuirEspecialidade, removerEspecialidade } from '@/lib/queries/especialidades';
+import { useClubId } from '@/hooks';
 
 interface Especialidade {
   id: string;
@@ -27,6 +29,7 @@ interface Especialidade {
 }
 
 export default function EspecialidadesPage() {
+  const CLUB_ID = useClubId();
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -40,6 +43,13 @@ export default function EspecialidadesPage() {
     descricao: '',
     nivel: 1,
   });
+  // Atribuição de especialidades
+  const [assignEsp, setAssignEsp] = useState<Especialidade | null>(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [membrosDisponiveis, setMembrosDisponiveis] = useState<any[]>([]);
+  const [membrosAtribuidos, setMembrosAtribuidos] = useState<any[]>([]);
+  const [selectedMembroId, setSelectedMembroId] = useState('');
+  const [assigning, setAssigning] = useState(false);
   const { addToast } = useToast();
 
   const carregarDados = async () => {
@@ -148,6 +158,53 @@ export default function EspecialidadesPage() {
     }
   };
 
+  const handleOpenAssign = async (esp: Especialidade) => {
+    setAssignEsp(esp);
+    setSelectedMembroId('');
+    try {
+      const [membros, atribuidos] = await Promise.all([
+        getMembrosDisponiveis(CLUB_ID),
+        getMembrosPorEspecialidade(esp.id),
+      ]);
+      setMembrosDisponiveis(membros);
+      setMembrosAtribuidos(atribuidos);
+      setIsAssignModalOpen(true);
+    } catch (error) {
+      console.error('Erro ao carregar membros:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar membros' });
+    }
+  };
+
+  const handleAtribuir = async () => {
+    if (!selectedMembroId || !assignEsp) return;
+    try {
+      setAssigning(true);
+      await atribuirEspecialidade(selectedMembroId, assignEsp.id);
+      addToast({ type: 'success', title: 'Sucesso', message: 'Especialidade atribuída ao membro' });
+      setSelectedMembroId('');
+      const atribuidos = await getMembrosPorEspecialidade(assignEsp.id);
+      setMembrosAtribuidos(atribuidos);
+    } catch (error) {
+      console.error('Erro ao atribuir:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao atribuir especialidade' });
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleRemoverAtribuicao = async (membroId: string) => {
+    if (!assignEsp) return;
+    try {
+      await removerEspecialidade(membroId, assignEsp.id);
+      addToast({ type: 'success', title: 'Removido', message: 'Atribuição removida' });
+      const atribuidos = await getMembrosPorEspecialidade(assignEsp.id);
+      setMembrosAtribuidos(atribuidos);
+    } catch (error) {
+      console.error('Erro ao remover:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao remover atribuição' });
+    }
+  };
+
   const getNivelLabel = (nivel: number) => {
     const labels: Record<number, string> = { 1: 'Básico', 2: 'Intermediário', 3: 'Avançado' };
     return labels[nivel] || 'Básico';
@@ -245,6 +302,9 @@ export default function EspecialidadesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1">
+                      <AppButton variant="ghost" size="sm" onClick={() => handleOpenAssign(esp)} title="Atribuir a membro">
+                        <UserPlus className="w-4 h-4 text-primary" />
+                      </AppButton>
                       <AppButton variant="ghost" size="sm" onClick={() => handleOpenModal(esp)}>
                         <Pencil className="w-4 h-4" />
                       </AppButton>
@@ -320,6 +380,83 @@ export default function EspecialidadesPage() {
               {editingEsp ? 'Salvar' : 'Criar'}
             </AppButton>
           </div>
+        </div>
+      </AppModal>
+      {/* Atribuir Especialidade Modal */}
+      <AppModal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        title={`Atribuir: ${assignEsp?.nome || ''}`}
+        size="md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Selecionar Membro</label>
+            <div className="flex gap-2">
+              <select
+                value={selectedMembroId}
+                onChange={(e) => setSelectedMembroId(e.target.value)}
+                className="flex-1 p-3 rounded-xl border border-border bg-card text-text-primary"
+              >
+                <option value="">Selecione um membro...</option>
+                {membrosDisponiveis
+                  .filter(m => !membrosAtribuidos.some(a => a.membro_id === m.id))
+                  .map(m => (
+                    <option key={m.id} value={m.id}>{m.nome}</option>
+                  ))}
+              </select>
+              <AppButton
+                onClick={handleAtribuir}
+                disabled={!selectedMembroId}
+                isLoading={assigning}
+              >
+                <UserPlus className="w-4 h-4 mr-1" />
+                Atribuir
+              </AppButton>
+            </div>
+          </div>
+
+          {membrosAtribuidos.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium mb-2">
+                Membros com esta especialidade ({membrosAtribuidos.length})
+              </h4>
+              <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                {membrosAtribuidos.map((ma) => (
+                  <div
+                    key={ma.id}
+                    className="flex items-center justify-between p-3 rounded-xl bg-card border border-border"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-text-primary">{ma.membro?.nome || 'Membro'}</p>
+                        <p className="text-xs text-muted">
+                          {ma.concluido ? '✓ Concluída' : 'Em andamento'}
+                          {ma.data_inicio && ` • Desde ${new Date(ma.data_inicio).toLocaleDateString('pt-BR')}`}
+                        </p>
+                      </div>
+                    </div>
+                    <AppButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoverAtribuicao(ma.membro_id)}
+                    >
+                      <X className="w-4 h-4 text-danger" />
+                    </AppButton>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {membrosAtribuidos.length === 0 && (
+            <p className="text-sm text-muted text-center py-4">
+              Nenhum membro atribuído a esta especialidade ainda
+            </p>
+          )}
         </div>
       </AppModal>
     </AppLayout>

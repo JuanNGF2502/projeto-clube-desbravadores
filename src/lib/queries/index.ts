@@ -56,3 +56,9 @@ export * from './dashboard';
 
 // Avaliações
 export * from './avaliacoes';
+
+// Especialidades
+export * from './especialidades';
+
+// Sessões de Avaliação
+export * from './sessoes-avaliacao';

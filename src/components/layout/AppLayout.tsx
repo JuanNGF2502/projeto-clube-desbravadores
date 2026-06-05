@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
 import { motion } from 'framer-motion';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
 import { ClubeSelector } from '@/components/ui/ClubeSelector';
 import { Home, Users, BookOpen, User } from 'lucide-react';
 
@@ -97,6 +98,7 @@ export function AppLayout({
       </header>
 
       <main className="flex-1 overflow-y-auto pb-24">
+        <Breadcrumbs />
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog, BookOpen, Mail, Award } from "lucide-react";
+import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog, BookOpen, Mail, Award, KeyRound } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AppCard } from "@/components/ui/AppCard";
 import { AppButton } from "@/components/ui/AppButton";
@@ -173,6 +173,7 @@ export default function ProfilePage() {
       { label: "Membros do Clube", icon: UserPlus, onClick: () => router.push('/membros') },
       { label: "Especialidades", icon: Award, onClick: () => router.push('/especialidades') },
     ] : []),
+    { label: "Trocar Senha", icon: KeyRound, onClick: () => router.push('/profile?reset=true') },
     { label: "Sair", icon: LogOut, variant: "danger", onClick: handleLogout },
   ];
 

@@ -18,6 +18,7 @@ import { getClasses, getEstatisticasClasse, getRequisitosPorClasse, getMembrosCo
 import { getClassesQueInstrutorEnsinaPorCargo } from '@/lib/queries/membros';
 import { getMembrosPorClasse } from '@/lib/queries/dashboard';
 import { useClubId, useAuth } from '@/hooks';
+import { concluirClasse, createTransicao } from '@/lib/queries';
 
 interface MemberClassProgress {
   memberId: string;
@@ -317,6 +318,24 @@ export default function ClassesPage() {
         title: 'Erro',
         message: 'Falha ao salvar instrução',
       });
+    }
+  };
+
+  const handleConcluirClasse = async (memberId: string) => {
+    if (!selectedClassProgress) return;
+    try {
+      await concluirClasse(memberId, selectedClassProgress.classId);
+      await createTransicao({
+        membro_id: memberId,
+        tipo: 'CONCLUIU_CLASSE',
+        descricao: `Concluiu a classe ${selectedClassProgress.className}`,
+        classe_id: selectedClassProgress.classId,
+      });
+      addToast({ type: 'success', title: 'Classe concluída!', message: 'Parabéns pela conclusão!' });
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao concluir classe:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao concluir classe' });
     }
   };
 
@@ -657,6 +676,7 @@ export default function ClassesPage() {
         modoInstrutor={isInstrutorMode}
         onSalvarInstrucao={isInstrutorMode && selectedClassProgress ? handleSalvarInstrucao : undefined}
         instrucaoProgress={instrucaoProgress || undefined}
+        onConcluirClasse={selectedMemberProgress ? handleConcluirClasse : undefined}
       />
     </AppLayout>
   );
