@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_clube_id ON profiles(clube_id);
 -- PARTE 3: TRIGGER UPDATED_AT
 -- ============================================================
 
-DROP FUNCTION IF EXISTS trigger_updated_at();
+DROP FUNCTION IF EXISTS trigger_updated_at() CASCADE;
 CREATE FUNCTION trigger_updated_at()
 RETURNS trigger
 LANGUAGE plpgsql
