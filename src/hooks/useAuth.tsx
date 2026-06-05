@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase/client';
 import { useAppStore } from '@/stores/appStore';
 
 export type UserRole = 'ADMIN' | 'LIDER' | 'DESBRAVADOR';
@@ -100,7 +100,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .maybeSingle();
 
       if (error && (error as any).code !== 'PGRST116') {
-        console.error('Erro ao buscar profile:', error);
+        console.warn('Erro ao buscar profile via query, tentando RPC fallback:', error);
+
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_my_profile');
+
+        if (rpcError) {
+          console.error('Erro no RPC fallback:', rpcError);
+          return;
+        }
+
+        if (rpcData) {
+          setProfile(rpcData as unknown as Profile);
+          if ((rpcData as any)?.clube_id) {
+            await loadClube((rpcData as any).clube_id);
+          }
+        }
         return;
       }
 
@@ -137,28 +151,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
             .eq('id', userId)
             .maybeSingle();
 
-          if (newProfile) setProfile(newProfile as Profile);
+          if (newProfile) {
+            setProfile(newProfile as Profile);
+            if (newProfile.clube_id) {
+              await loadClube(newProfile.clube_id);
+            }
+          }
         }
 
         return;
       }
 
-      setProfile(data as Profile);
+      if (data) {
+        setProfile(data as Profile);
+      }
 
       // Se o usuário tem clube associado, atualizar o store
       if (data?.clube_id) {
-        const { data: clube } = await supabase
-          .from('clubes')
-          .select('id, nome, cidade, estado')
-          .eq('id', data.clube_id)
-          .maybeSingle();
-
-        if (clube) {
-          setClubeAtual(clube as any);
-        }
+        await loadClube(data.clube_id);
       }
     } catch (error) {
       console.error('Erro ao buscar profile:', error);
+    }
+  };
+
+  const loadClube = async (clubeId: string) => {
+    try {
+      const { data: clube } = await supabase
+        .from('clubes')
+        .select('id, nome, cidade, estado')
+        .eq('id', clubeId)
+        .maybeSingle();
+
+      if (clube) {
+        setClubeAtual(clube as any);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar clube:', error);
     }
   };
 

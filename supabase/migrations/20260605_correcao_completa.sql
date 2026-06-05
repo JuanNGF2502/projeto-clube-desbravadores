@@ -615,3 +615,32 @@ BEGIN
     updated_at = now();
 END;
 $$;
+
+-- ============================================================
+-- PARTE 11: PERMISSÕES DE TABELA E RPC DE FALLBACK
+-- ============================================================
+
+-- Garante que as roles anon/authenticated possam ler tabelas com RLS
+-- Necessário para que as políticas RLS sejam avaliadas corretamente
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+
+-- RPC de fallback: busca o profile do usuário atual bypassando RLS
+-- Usado pelo hook useAuth quando a query direta falha
+DROP FUNCTION IF EXISTS public.get_my_profile();
+CREATE FUNCTION public.get_my_profile()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_profile jsonb;
+BEGIN
+  SELECT row_to_json(p)::jsonb INTO v_profile
+  FROM profiles p
+  WHERE p.id = auth.uid();
+
+  RETURN v_profile;
+END;
+$$;
