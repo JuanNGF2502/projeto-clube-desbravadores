@@ -17,10 +17,12 @@ export {
   createMembroUnidade,
   deleteMembroCargos,
   deleteMembroClassesAtuais,
+  syncProfileFromMembro,
   createTransicao,
   getTransicoesPorMembro,
   getProgressoRequisito,
   updateRequisito,
+  concluirClasse,
 } from './membros';
 
 // Unidades

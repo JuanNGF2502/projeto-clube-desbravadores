@@ -51,11 +51,20 @@ export default function GerenciarRequisitosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [editingRequisito, setEditingRequisito] = useState<Requisito | null>(null);
+  const [editingClasse, setEditingClasse] = useState<Classe | null>(null);
+  const [savingClass, setSavingClass] = useState(false);
   const [formData, setFormData] = useState({
     classe_id: '',
     area: '',
     nome: '',
+    descricao: '',
+    ordem: 1,
+  });
+  const [classFormData, setClassFormData] = useState({
+    nome: '',
+    cor: '#3B82F6',
     descricao: '',
     ordem: 1,
   });
@@ -128,6 +137,81 @@ export default function GerenciarRequisitosPage() {
 
   const getRequisitosPorClasse = (classeId: string) => {
     return requisitos.filter(r => r.classe_id === classeId);
+  };
+
+  const handleOpenClassModal = (classe?: Classe) => {
+    if (classe) {
+      setEditingClasse(classe);
+      setClassFormData({
+        nome: classe.nome,
+        cor: classe.cor,
+        descricao: classe.descricao || '',
+        ordem: classe.ordem,
+      });
+    } else {
+      setEditingClasse(null);
+      setClassFormData({ nome: '', cor: '#3B82F6', descricao: '', ordem: 1 });
+    }
+    setIsClassModalOpen(true);
+  };
+
+  const handleSaveClass = async () => {
+    if (!classFormData.nome.trim()) {
+      addToast({ type: 'error', title: 'Erro', message: 'Nome é obrigatório' });
+      return;
+    }
+    try {
+      setSavingClass(true);
+      if (editingClasse) {
+        const { error } = await supabase
+          .from('classes')
+          .update({
+            nome: classFormData.nome,
+            cor: classFormData.cor,
+            descricao: classFormData.descricao || null,
+            ordem: classFormData.ordem,
+          })
+          .eq('id', editingClasse.id);
+        if (error) throw error;
+        addToast({ type: 'success', title: 'Sucesso', message: 'Classe atualizada' });
+      } else {
+        const { error } = await supabase
+          .from('classes')
+          .insert({
+            nome: classFormData.nome,
+            cor: classFormData.cor,
+            descricao: classFormData.descricao || null,
+            ordem: classFormData.ordem,
+            ativo: true,
+          });
+        if (error) throw error;
+        addToast({ type: 'success', title: 'Sucesso', message: 'Classe criada' });
+      }
+      setIsClassModalOpen(false);
+      setEditingClasse(null);
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao salvar classe:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar classe' });
+    } finally {
+      setSavingClass(false);
+    }
+  };
+
+  const handleDeleteClass = async (classe: Classe) => {
+    if (!confirm(`Tem certeza que deseja excluir a classe "${classe.nome}" e todos os seus requisitos?`)) return;
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', classe.id);
+      if (error) throw error;
+      addToast({ type: 'success', title: 'Sucesso', message: 'Classe excluída' });
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao excluir classe:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao excluir classe' });
+    }
   };
 
   const handleOpenModal = (classeId?: string, requisito?: Requisito) => {
@@ -247,10 +331,16 @@ export default function GerenciarRequisitosPage() {
       title="Gerenciar Requisitos"
       subtitle="CRUD completo dos requisitos das classes"
       actions={
-        <AppButton variant="primary" size="sm" onClick={() => handleOpenModal(classes[0]?.id)}>
-          <Plus className="w-4 h-4 mr-1" />
-          Novo Requisito
-        </AppButton>
+        <div className="flex gap-2">
+          <AppButton variant="secondary" size="sm" onClick={() => handleOpenClassModal()}>
+            <Plus className="w-4 h-4 mr-1" />
+            Nova Classe
+          </AppButton>
+          <AppButton variant="primary" size="sm" onClick={() => handleOpenModal(classes[0]?.id)}>
+            <Plus className="w-4 h-4 mr-1" />
+            Novo Requisito
+          </AppButton>
+        </div>
       }
     >
       <div className="space-y-4">
@@ -288,7 +378,29 @@ export default function GerenciarRequisitosPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <AppButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenClassModal(classe);
+                      }}
+                      title="Editar classe"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </AppButton>
+                    <AppButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClass(classe);
+                      }}
+                      title="Excluir classe"
+                    >
+                      <Trash2 className="w-4 h-4 text-danger" />
+                    </AppButton>
                     <AppButton
                       variant="ghost"
                       size="sm"
@@ -433,6 +545,52 @@ export default function GerenciarRequisitosPage() {
             <AppButton onClick={handleSave} className="flex-1">
               <Save className="w-4 h-4 mr-1" />
               Salvar
+            </AppButton>
+          </div>
+        </div>
+      </AppModal>
+
+      {/* Class CRUD Modal */}
+      <AppModal
+        isOpen={isClassModalOpen}
+        onClose={() => { setIsClassModalOpen(false); setEditingClasse(null); }}
+        title={editingClasse ? 'Editar Classe' : 'Nova Classe'}
+        size="md"
+      >
+        <div className="space-y-4">
+          <AppInput
+            label="Nome da Classe *"
+            placeholder="Ex: Amigo, Companheiro..."
+            value={classFormData.nome}
+            onChange={(e) => setClassFormData({ ...classFormData, nome: e.target.value })}
+          />
+          <AppInput
+            label="Cor (hex)"
+            placeholder="#3B82F6"
+            value={classFormData.cor}
+            onChange={(e) => setClassFormData({ ...classFormData, cor: e.target.value })}
+          />
+          <AppInput
+            label="Ordem *"
+            type="number"
+            min={1}
+            value={classFormData.ordem}
+            onChange={(e) => setClassFormData({ ...classFormData, ordem: parseInt(e.target.value) || 1 })}
+          />
+          <AppTextarea
+            label="Descrição"
+            placeholder="Descrição da classe..."
+            value={classFormData.descricao}
+            onChange={(e) => setClassFormData({ ...classFormData, descricao: e.target.value })}
+            rows={3}
+          />
+          <div className="flex gap-3 pt-2">
+            <AppButton variant="secondary" onClick={() => { setIsClassModalOpen(false); setEditingClasse(null); }} className="flex-1">
+              Cancelar
+            </AppButton>
+            <AppButton onClick={handleSaveClass} isLoading={savingClass} className="flex-1">
+              <Save className="w-4 h-4 mr-1" />
+              {editingClasse ? 'Atualizar' : 'Criar'}
             </AppButton>
           </div>
         </div>

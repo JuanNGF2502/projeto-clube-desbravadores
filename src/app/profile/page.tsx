@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog, BookOpen, Mail } from "lucide-react";
+import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog, BookOpen, Mail, Award } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AppCard } from "@/components/ui/AppCard";
 import { AppButton } from "@/components/ui/AppButton";
@@ -17,6 +17,8 @@ import { useAuth, Profile } from "@/hooks";
 import { cn } from "@/utils/cn";
 import { Unit, UNIT_GENDERS, DEFAULT_UNIT_COLORS } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { getTodasUnidades, createUnidade, updateUnidade, deleteUnidade } from '@/lib/queries';
+import { useClubId } from '@/hooks';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -32,12 +34,11 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // Unit management state
+  const CLUB_ID = useClubId();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoadingUnits, setIsLoadingUnits] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
-  const [units, setUnits] = useState<Unit[]>([
-    { id: '1', nome: 'Lobos', genero: 'M', cores: ['#3B82F6', '#1E40AF', '#1E3A8A'], ativo: true, clubeId: '1', membrosCount: 12, createdAt: new Date() },
-    { id: '2', nome: 'Águias', genero: 'M', cores: ['#C6A15B', '#A16207', '#854D0E'], ativo: true, clubeId: '1', membrosCount: 10, createdAt: new Date() },
-  ]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [formData, setFormData] = useState({
     nome: '',
     genero: 'M' as 'M' | 'F',
@@ -47,22 +48,60 @@ export default function ProfilePage() {
     historiaNome: '',
   });
 
-  const handleSaveUnit = () => {
+  const carregarUnidades = async () => {
+    if (!CLUB_ID) return;
+    try {
+      setIsLoadingUnits(true);
+      const data = await getTodasUnidades(CLUB_ID);
+      setUnits(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar unidades:', error);
+    } finally {
+      setIsLoadingUnits(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarUnidades();
+  }, [CLUB_ID]);
+
+  const handleSaveUnit = async () => {
     if (!formData.nome.trim()) {
       addToast({ type: 'error', title: 'Erro', message: 'Nome é obrigatório' });
       return;
     }
 
-    if (editingUnit) {
-      setUnits(units.map(u => u.id === editingUnit.id ? { ...u, nome: formData.nome, genero: formData.genero, cores: formData.cores } : u));
-      addToast({ type: 'success', title: 'Unidade atualizada', message: `${formData.nome} foi atualizada` });
-    } else {
-      setUnits([...units, { id: String(Date.now()), nome: formData.nome, genero: formData.genero, cores: formData.cores, ativo: true, clubeId: '1', membrosCount: 0, createdAt: new Date() }]);
-      addToast({ type: 'success', title: 'Unidade criada', message: `${formData.nome} foi criada` });
+    try {
+      if (editingUnit) {
+        await updateUnidade(editingUnit.id, {
+          nome: formData.nome,
+          genero: formData.genero,
+          cores: formData.cores,
+          clube_id: CLUB_ID,
+          grito_de_guerra: formData.gritoDeGuerra || undefined,
+          significado_logo: formData.significadoLogo || undefined,
+          historia_nome: formData.historiaNome || undefined,
+        });
+        addToast({ type: 'success', title: 'Unidade atualizada', message: `${formData.nome} foi atualizada` });
+      } else {
+        await createUnidade({
+          nome: formData.nome,
+          genero: formData.genero,
+          cores: formData.cores,
+          clube_id: CLUB_ID,
+          grito_de_guerra: formData.gritoDeGuerra || undefined,
+          significado_logo: formData.significadoLogo || undefined,
+          historia_nome: formData.historiaNome || undefined,
+        });
+        addToast({ type: 'success', title: 'Unidade criada', message: `${formData.nome} foi criada` });
+      }
+      setIsModalOpen(false);
+      setEditingUnit(null);
+      setFormData({ nome: '', genero: 'M', cores: [...DEFAULT_UNIT_COLORS], gritoDeGuerra: '', significadoLogo: '', historiaNome: '' });
+      await carregarUnidades();
+    } catch (error) {
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar unidade' });
     }
-    setIsModalOpen(false);
-    setEditingUnit(null);
-    setFormData({ nome: '', genero: 'M', cores: [...DEFAULT_UNIT_COLORS], gritoDeGuerra: '', significadoLogo: '', historiaNome: '' });
   };
 
   const handleEditUnit = (unit: Unit) => {
@@ -71,9 +110,14 @@ export default function ProfilePage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteUnit = (unit: Unit) => {
-    setUnits(units.filter(u => u.id !== unit.id));
-    addToast({ type: 'success', title: 'Unidade removida', message: `${unit.nome} foi removida` });
+  const handleDeleteUnit = async (unit: Unit) => {
+    try {
+      await deleteUnidade(unit.id);
+      addToast({ type: 'success', title: 'Unidade removida', message: `${unit.nome} foi removida` });
+      await carregarUnidades();
+    } catch (error) {
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao remover unidade' });
+    }
   };
 
   const openCreateModal = () => {
@@ -128,6 +172,7 @@ export default function ProfilePage() {
       { label: "Gerenciar Requisitos das Classes", icon: BookOpen, onClick: () => router.push('/classes/gerenciar') },
       { label: "Gerenciar Unidades", icon: UserCog, onClick: () => router.push('/unidades/gerenciar') },
       { label: "Membros do Clube", icon: UserPlus, onClick: () => router.push('/membros') },
+      { label: "Especialidades", icon: Award, onClick: () => router.push('/especialidades') },
     ] : []),
     { label: "Sair", icon: LogOut, variant: "danger", onClick: handleLogout },
   ];

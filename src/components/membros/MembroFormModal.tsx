@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User, Phone, Mail, MapPin, Shield, BookOpen, Users, Check, ArrowRight, ArrowLeft, Pencil, Loader2 } from 'lucide-react';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppButton } from '@/components/ui/AppButton';
@@ -20,6 +20,12 @@ import {
   Unit,
   ClasseAtual,
 } from '@/types';
+
+interface CargoItem {
+  tipo: CargoTipo;
+  classeId?: string;
+  unidadeId?: string;
+}
 
 interface MembroFormModalProps {
   isOpen: boolean;
@@ -61,14 +67,20 @@ export function MembroFormModal({
     unidadeId: '',
     classesAtuais: [] as string[],
     categoriaMembro: '' as 'DESBRAVADOR' | 'LIDER' | '',
-    cargos: [] as CargoTipo[],
+    cargos: [] as CargoItem[],
     cargoObservacao: '',
     ativo: true,
   });
 
   const totalSteps = 4;
 
+  const usuarioRef = useRef(usuario);
+
   useEffect(() => {
+    if (!isOpen) return;
+    if (usuario === usuarioRef.current && usuario) return;
+    usuarioRef.current = usuario;
+
     if (usuario) {
       const cargosAtivos = usuario.cargos?.filter(c => c.ativo) || [];
       let categoria: 'DESBRAVADOR' | 'LIDER' | '' = '';
@@ -88,10 +100,11 @@ export function MembroFormModal({
         return c.classeId ? String(c.classeId) : '';
       }).filter(Boolean) || [];
 
-      const cargosList = (cargosAtivos.map(c => {
-        if (typeof c === 'string') return c as CargoTipo;
-        return String(c.tipo) as CargoTipo;
-      }) || []).filter(Boolean);
+      const cargosList = (cargosAtivos.map(c => ({
+        tipo: typeof c === 'string' ? c as CargoTipo : c.tipo,
+        classeId: (c as any).classeId || undefined,
+        unidadeId: (typeof c === 'string' ? undefined : (c as any).unidadeId) || undefined,
+      })) || []).filter(c => c.tipo);
 
       setFormData({
         nome: usuario.nome,
@@ -132,7 +145,7 @@ export function MembroFormModal({
       });
     }
     setStep(1);
-  }, [usuario, isOpen]);
+  }, [isOpen]);
 
   const updateField = (field: string, value: string | string[] | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -150,12 +163,21 @@ export function MembroFormModal({
 
   const toggleCargo = (cargo: CargoTipo) => {
     setFormData(prev => {
-      const exists = prev.cargos.includes(cargo);
+      const exists = prev.cargos.some(c => c.tipo === cargo);
       if (exists) {
-        return { ...prev, cargos: prev.cargos.filter(c => c !== cargo) };
+        return { ...prev, cargos: prev.cargos.filter(c => c.tipo !== cargo) };
       }
-      return { ...prev, cargos: [...prev.cargos, cargo] };
+      return { ...prev, cargos: [...prev.cargos, { tipo: cargo }] };
     });
+  };
+
+  const updateCargoMeta = (cargo: CargoTipo, field: 'classeId' | 'unidadeId', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      cargos: prev.cargos.map(c =>
+        c.tipo === cargo ? { ...c, [field]: value } : c
+      ),
+    }));
   };
 
   const handleNext = () => {
@@ -167,6 +189,7 @@ export function MembroFormModal({
   };
 
   const handleSubmit = () => {
+    if (isSaving) return;
     const novoUsuario: Partial<Usuario> = {
       id: usuario?.id || crypto.randomUUID(),
       nome: formData.nome,
@@ -183,12 +206,13 @@ export function MembroFormModal({
         dataInicio: new Date(),
       })) as ClasseAtual[],
       classesConcluidas: usuario?.classesConcluidas || [],
-      cargos: formData.cargos.map(tipo => ({
-        tipo,
+      cargos: formData.cargos.map(c => ({
+        tipo: c.tipo,
         dataAtribuicao: new Date(),
-        unidadeId: formData.unidadeId || undefined,
+        unidadeId: c.unidadeId || formData.unidadeId || undefined,
+        classeId: c.classeId,
         ativo: true,
-        observacao: tipo === 'OUTRO' ? formData.cargoObservacao : undefined,
+        observacao: c.tipo === 'OUTRO' ? formData.cargoObservacao : undefined,
       })),
       unidadeAtualId: formData.unidadeId || undefined,
       unidadesAnteriores: usuario?.unidadesAnteriores || [],
@@ -207,7 +231,6 @@ export function MembroFormModal({
       observacoes: formData.observacoes || undefined,
     };
     onSave(novoUsuario);
-    onClose();
   };
 
   const stepLabels = ['Dados', 'Categoria', 'Cargos', 'Finalizar'];
@@ -411,40 +434,70 @@ export function MembroFormModal({
           {/* Cargos em 2 colunas */}
           <div className="grid grid-cols-2 gap-2">
             {getCargosPorCategoria(formData.categoriaMembro as CategoriaMembro).map((cargo) => {
-              const isSelected = formData.cargos.includes(cargo.tipo);
+              const isSelected = formData.cargos.some(c => c.tipo === cargo.tipo);
+              const cargoItem = formData.cargos.find(c => c.tipo === cargo.tipo);
               return (
-                <button
-                  key={cargo.tipo}
-                  onClick={() => toggleCargo(cargo.tipo)}
-                  className={cn(
-                    'p-3 rounded-xl border-2 text-left transition-all flex items-center justify-between',
-                    isSelected
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                  )}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: cargo.cor }}
-                    />
-                    <span className="font-medium text-text-primary text-sm truncate">{cargo.nome}</span>
-                  </div>
-                  <div
+                <div key={cargo.tipo} className="space-y-2">
+                  <button
+                    onClick={() => toggleCargo(cargo.tipo)}
                     className={cn(
-                      'w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0',
-                      isSelected ? 'bg-primary text-white' : 'bg-muted'
+                      'w-full p-3 rounded-xl border-2 text-left transition-all flex items-center justify-between',
+                      isSelected
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/50'
                     )}
                   >
-                    {isSelected && <Check className="w-3 h-3" />}
-                  </div>
-                </button>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: cargo.cor }}
+                      />
+                      <span className="font-medium text-text-primary text-sm truncate">{cargo.nome}</span>
+                    </div>
+                    <div
+                      className={cn(
+                        'w-5 h-5 rounded-full flex items-center justify-center transition-all flex-shrink-0',
+                        isSelected ? 'bg-primary text-white' : 'bg-muted'
+                      )}
+                    >
+                      {isSelected && <Check className="w-3 h-3" />}
+                    </div>
+                  </button>
+
+                  {/* INSTRUTOR_CLASSE: selecionar classe */}
+                  {isSelected && cargo.tipo === 'INSTRUTOR_CLASSE' && (
+                    <select
+                      value={cargoItem?.classeId || ''}
+                      onChange={(e) => updateCargoMeta(cargo.tipo, 'classeId', e.target.value)}
+                      className="w-full p-2 rounded-lg border border-border bg-background text-text-primary text-sm"
+                    >
+                      <option value="">Selecione a classe</option>
+                      {DEFAULT_CLASSES.map(cl => (
+                        <option key={cl.id} value={cl.id}>{cl.nome}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {/* CONSELHEIRO / CONSELHEIRO_ASSOC: selecionar unidade */}
+                  {isSelected && (cargo.tipo === 'CONSELHEIRO' || cargo.tipo === 'CONSELHEIRO_ASSOC') && (
+                    <select
+                      value={cargoItem?.unidadeId || ''}
+                      onChange={(e) => updateCargoMeta(cargo.tipo, 'unidadeId', e.target.value)}
+                      className="w-full p-2 rounded-lg border border-border bg-background text-text-primary text-sm"
+                    >
+                      <option value="">Selecione a unidade</option>
+                      {unidades.map(u => (
+                        <option key={u.id} value={u.id}>{u.nome}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               );
             })}
           </div>
 
           {/* Campo para "Outro" */}
-          {formData.cargos.includes('OUTRO') && (
+          {formData.cargos.some(c => c.tipo === 'OUTRO') && (
             <AppInput
               label="Descreva o cargo"
               value={formData.cargoObservacao}
@@ -573,14 +626,23 @@ export function MembroFormModal({
                 </span>
               </div>
               {formData.cargos.length > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted">Cargos</span>
-                  <div className="flex flex-wrap gap-1 justify-end">
-                    {formData.cargos.map(cargo => {
-                      const info = getCargoByTipo(cargo);
+                <div className="flex flex-col gap-2">
+                  <span className="text-muted text-sm">Cargos</span>
+                  <div className="flex flex-wrap gap-1">
+                    {formData.cargos.map(c => {
+                      const info = getCargoByTipo(c.tipo);
+                      const detalhes: string[] = [];
+                      if (c.tipo === 'INSTRUTOR_CLASSE' && c.classeId) {
+                        const cl = getClasseById(c.classeId);
+                        if (cl) detalhes.push(cl.nome);
+                      }
+                      if ((c.tipo === 'CONSELHEIRO' || c.tipo === 'CONSELHEIRO_ASSOC') && c.unidadeId) {
+                        const un = unidades.find(u => u.id === c.unidadeId);
+                        if (un) detalhes.push(un.nome);
+                      }
                       return info ? (
-                        <AppBadge key={cargo} size="sm" color={info.cor}>
-                          {info.nome}
+                        <AppBadge key={c.tipo} size="sm" color={info.cor}>
+                          {info.nome}{detalhes.length > 0 ? ` (${detalhes.join(', ')})` : ''}
                         </AppBadge>
                       ) : null;
                     })}

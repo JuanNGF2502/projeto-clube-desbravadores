@@ -18,8 +18,9 @@ import { AppInput } from '@/components/ui/AppInput';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppEmptyState } from '@/components/ui/AppEmptyState';
 import { useToast } from '@/components/ui/Toast';
-import { getMembros, getUnidades, createMembro, updateMembro, deleteMembro, createMembroCargo, createMembroClasseAtual, createMembroUnidade, deleteMembroCargos, deleteMembroClassesAtuais, getClasses, getCargos } from '@/lib/queries';
+import { getMembros, getUnidades, createMembro, updateMembro, deleteMembro, createMembroCargo, createMembroClasseAtual, createMembroUnidade, deleteMembroCargos, deleteMembroClassesAtuais, getClasses, getCargos, syncProfileFromMembro } from '@/lib/queries';
 import { Unit, CargoTipo, DEFAULT_CLASSES } from '@/types';
+import { useClubId } from '@/hooks';
 
 interface MembroData {
   id: string;
@@ -52,6 +53,7 @@ interface MembroData {
     ativo: boolean;
     data_atribuicao?: string;
     unidade_id?: string;
+    classe_id?: string;
     observacao?: string;
   }[];
   membros_classes_atuais?: {
@@ -79,8 +81,7 @@ export default function MembrosPage() {
   const [isSaving, setIsSaving] = useState(false);
   const { addToast } = useToast();
 
-  // ID fixo para desenvolvimento - em produção viria do auth
-  const CLUB_ID = '00000000-0000-0000-0000-000000000001';
+  const CLUB_ID = useClubId();
 
   const carregarDados = async () => {
     try {
@@ -104,8 +105,10 @@ export default function MembrosPage() {
   };
 
   useEffect(() => {
-    carregarDados();
-  }, []);
+    if (CLUB_ID) {
+      carregarDados();
+    }
+  }, [CLUB_ID]);
 
   const membrosFiltrados = useMemo(() => {
     return membros.filter((membro) => {
@@ -147,7 +150,8 @@ export default function MembrosPage() {
   const handleSalvarMembro = async (dados: any) => {
     try {
       setIsSaving(true);
-      // Extrair apenas os campos que existem na tabela membros
+      const membroUnidadeId = dados.unidadeAtualId || dados.unidadeId || null;
+
       const membroData = {
         nome: dados.nome,
         nome_social: dados.nomeSocial || null,
@@ -159,24 +163,27 @@ export default function MembrosPage() {
         email: dados.email || null,
         foto: dados.foto || null,
         ativo: dados.ativo !== undefined ? dados.ativo : true,
-        unidade_id: dados.unidadeAtualId || dados.unidadeId || null,
+        unidade_id: membroUnidadeId,
+        endereco: dados.endereco || null,
+        responsavel: dados.responsavel || null,
+        observacoes: dados.observacoes || null,
       };
 
       if (editandoMembro) {
         await updateMembro(editandoMembro.id, membroData);
 
-        const unidadeId = dados.unidadeAtualId || dados.unidadeId || null;
-
-        // Atualizar cargos (delete + insert)
         await deleteMembroCargos(editandoMembro.id);
         if (dados.cargos && dados.cargos.length > 0) {
           for (const cargo of dados.cargos) {
             const cargoTipo = typeof cargo === 'string' ? cargo : cargo.tipo;
-            await createMembroCargo(editandoMembro.id, cargoTipo, unidadeId);
+            const cargoUnidadeId = typeof cargo === 'object'
+              ? (cargo.unidadeId || membroUnidadeId)
+              : membroUnidadeId;
+            const cargoClasseId = typeof cargo === 'object' ? cargo.classeId || null : null;
+            await createMembroCargo(editandoMembro.id, cargoTipo, cargoUnidadeId, cargoClasseId);
           }
         }
 
-        // Atualizar classes atuais (delete + insert)
         await deleteMembroClassesAtuais(editandoMembro.id);
         if (dados.classesAtuais && dados.classesAtuais.length > 0) {
           for (const classe of dados.classesAtuais) {
@@ -185,25 +192,27 @@ export default function MembrosPage() {
           }
         }
 
+        // Sync profile if member has a linked user
+        await syncProfileFromMembro(editandoMembro.id);
+
         addToast({ type: 'success', title: 'Sucesso', message: 'Membro atualizado' });
       } else {
-        // Criar membro
         const novoMembro = await createMembro({
           ...membroData,
           clube_id: CLUB_ID,
         });
 
-        const unidadeId = dados.unidadeAtualId || dados.unidadeId || null;
-
-        // Salvar cargos
         if (dados.cargos && dados.cargos.length > 0) {
           for (const cargo of dados.cargos) {
             const cargoTipo = typeof cargo === 'string' ? cargo : cargo.tipo;
-            await createMembroCargo(novoMembro.id, cargoTipo, unidadeId);
+            const cargoUnidadeId = typeof cargo === 'object'
+              ? (cargo.unidadeId || membroUnidadeId)
+              : membroUnidadeId;
+            const cargoClasseId = typeof cargo === 'object' ? cargo.classeId || null : null;
+            await createMembroCargo(novoMembro.id, cargoTipo, cargoUnidadeId, cargoClasseId);
           }
         }
 
-        // Salvar classes atuais
         if (dados.classesAtuais && dados.classesAtuais.length > 0) {
           for (const classe of dados.classesAtuais) {
             const classeId = typeof classe === 'string' ? classe : classe.classeId;
@@ -211,9 +220,8 @@ export default function MembrosPage() {
           }
         }
 
-        // Salvar histórico de unidade
-        if (unidadeId) {
-          await createMembroUnidade(novoMembro.id, unidadeId);
+        if (membroUnidadeId) {
+          await createMembroUnidade(novoMembro.id, membroUnidadeId);
         }
 
         addToast({ type: 'success', title: 'Sucesso', message: 'Membro criado' });
@@ -261,6 +269,7 @@ export default function MembrosPage() {
         tipo: c.cargo_tipo as CargoTipo,
         dataAtribuicao: c.data_atribuicao ? new Date(c.data_atribuicao) : new Date(),
         unidadeId: c.unidade_id || membro.unidade_id,
+        classeId: c.classe_id || undefined,
         ativo: c.ativo,
         observacao: c.observacao,
       })) || [],
@@ -326,10 +335,6 @@ export default function MembrosPage() {
           >
             <UserMinus className="w-4 h-4 mr-1" />
             Inativos ({estatisticas.inativos})
-          </AppButton>
-          <AppButton variant="primary" size="sm" onClick={handleNovoMembro}>
-            <Plus className="w-4 h-4 mr-1" />
-            Novo
           </AppButton>
         </div>
       }
@@ -427,9 +432,15 @@ export default function MembrosPage() {
           />
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-muted">
-              Mostrando {membrosFiltrados.length} de {membros.length} membros
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted">
+                Mostrando {membrosFiltrados.length} de {membros.length} membros
+              </p>
+              <AppButton variant="primary" size="sm" onClick={handleNovoMembro}>
+                <Plus className="w-4 h-4 mr-1" />
+                Novo
+              </AppButton>
+            </div>
             {membrosFiltrados.map((membro) => (
               <MembroCard
                 key={membro.id}
@@ -453,6 +464,7 @@ export default function MembrosPage() {
                     tipo: c.cargo_tipo as CargoTipo,
                     dataAtribuicao: c.data_atribuicao ? new Date(c.data_atribuicao) : new Date(),
                     unidadeId: c.unidade_id || membro.unidade_id,
+                    classeId: c.classe_id || undefined,
                     ativo: c.ativo,
                     observacao: c.observacao,
                   })) || [],
@@ -506,6 +518,7 @@ export default function MembrosPage() {
             tipo: c.cargo_tipo as CargoTipo,
             dataAtribuicao: c.data_atribuicao ? new Date(c.data_atribuicao) : new Date(),
             unidadeId: c.unidade_id || undefined,
+            classeId: c.classe_id || undefined,
             ativo: c.ativo !== false,
             observacao: c.observacao || undefined,
           })) || [],
@@ -529,6 +542,7 @@ export default function MembrosPage() {
         isOpen={!!membroSelecionado}
         onClose={() => setMembroSelecionado(null)}
         onEdit={handleEditarDeDetalhes}
+        onUpdate={carregarDados}
         membro={membroSelecionado}
         unidadeCores={membroSelecionado?.unidade_id ? unidadesCores[membroSelecionado.unidade_id] : undefined}
       />

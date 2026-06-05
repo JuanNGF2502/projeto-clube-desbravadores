@@ -15,6 +15,7 @@ export interface Profile {
   role: UserRole;
   clube_id?: string;
   unidade_id?: string;
+  membro_id?: string;
   ativo: boolean;
 }
 
@@ -104,7 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      // Se não encontrou profile, tentar criar um com dados do auth.user
+      // Se não encontrou profile, tentar criar um via RPC (SECURITY DEFINER)
       if (!data) {
         console.warn('Profile não encontrado, criando novo...');
         const { data: userData, error: userErr } = await supabase.auth.getUser();
@@ -118,22 +119,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const nomeFromMeta = (user.user_metadata as any)?.nome || user.email?.split('@')[0] || 'Usuário';
           const roleFromMeta = (user.user_metadata as any)?.role || 'DESBRAVADOR';
 
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: userId,
-              nome: nomeFromMeta,
-              email: user.email || '',
-              role: roleFromMeta,
-              ativo: true,
-            })
-            .select()
-            .maybeSingle();
+          const { error: createError } = await supabase.rpc('create_user_profile', {
+            p_user_id: userId,
+            p_nome: nomeFromMeta,
+            p_email: user.email || '',
+            p_role: roleFromMeta,
+          });
 
           if (createError) {
             console.error('Erro ao criar profile:', createError);
             return;
           }
+
+          // Reler o profile
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
 
           if (newProfile) setProfile(newProfile as Profile);
         }

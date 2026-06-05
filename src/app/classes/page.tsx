@@ -14,9 +14,10 @@ import { ProgressCircle } from '@/components/ui/ProgressCircle';
 import { useToast } from '@/components/ui/Toast';
 import { DEFAULT_CLASSES, Classe } from '@/types';
 import { ClassRequirementsPopup } from '@/components/classes';
-import { getClasses, getEstatisticasClasse, getRequisitosPorClasse, getMembrosComProgresso, RequisitoClasse, MembroComProgresso, updateProgressoRequisito, getStatusInstrucaoPorClasse, salvarInstrucaoRequisito, getProgressoInstrucaoClasse } from '@/lib/queries/classes';
+import { getClasses, getEstatisticasClasse, getRequisitosPorClasse, getMembrosComProgresso, RequisitoClasse, MembroComProgresso, updateProgressoRequisito, getStatusInstrucaoPorClasse, salvarInstrucaoRequisito, getProgressoInstrucaoClasse, getClassesQueInstrutorEnsina } from '@/lib/queries/classes';
+import { getClassesQueInstrutorEnsinaPorCargo } from '@/lib/queries/membros';
 import { getMembrosPorClasse } from '@/lib/queries/dashboard';
-import { useClubId } from '@/hooks';
+import { useClubId, useAuth } from '@/hooks';
 
 interface MemberClassProgress {
   memberId: string;
@@ -122,9 +123,14 @@ export default function ClassesPage() {
   const [selectedMemberProgress, setSelectedMemberProgress] = useState<MemberClassProgress | null>(null);
   const [isRequirementsModalOpen, setIsRequirementsModalOpen] = useState(false);
   const [selectedClassProgress, setSelectedClassProgress] = useState<ClassProgress | null>(null);
-  const [modoInstrutor, setModoInstrutor] = useState(false);
+  const [classesQueInstrui, setClassesQueInstrui] = useState<string[]>([]);
   const [instrucaoProgress, setInstrucaoProgress] = useState<{ total: number; ensinados: number; percentage: number } | null>(null);
   const { addToast } = useToast();
+
+  const { user, profile } = useAuth();
+
+  const isInstrutorMode = profile?.role === 'ADMIN' || profile?.role === 'DIRIGENTE' || classesQueInstrui.length > 0;
+  const showAllClasses = profile?.role === 'ADMIN' || profile?.role === 'DIRIGENTE' || classesQueInstrui.length === 0;
 
   const carregarDados = async () => {
     try {
@@ -208,11 +214,29 @@ export default function ClassesPage() {
     }
   }, [clubId]);
 
+  useEffect(() => {
+    if (user && profile) {
+      if (profile.role !== 'ADMIN' && profile.role !== 'DIRIGENTE') {
+        Promise.all([
+          getClassesQueInstrutorEnsina(user.id),
+          profile.membro_id ? getClassesQueInstrutorEnsinaPorCargo(profile.membro_id) : Promise.resolve([]),
+        ]).then(([fromInstrucoes, fromCargos]) => {
+          const merged = [...new Set([...fromInstrucoes, ...fromCargos])];
+          setClassesQueInstrui(merged);
+        }).catch(() => {
+          setClassesQueInstrui([]);
+        });
+      } else {
+        setClassesQueInstrui([]);
+      }
+    }
+  }, [user, profile]);
+
   const handleClassClick = (classe: MemberClass) => {
     const areas = getClassAreasData(classe.requisitos || []);
 
     // Se modo instrutor, usar dados de progresso de instrução
-    const progressToUse = modoInstrutor
+    const progressToUse = isInstrutorMode
       ? { ensinados: classe.ensinadosCount || 0, percentage: classe.instrucaoPercentage || 0 }
       : { total: areas.reduce((acc, a) => acc + a.requirements.length, 0), ensinados: 0, percentage: 0 };
 
@@ -223,12 +247,12 @@ export default function ClassesPage() {
       areas,
       completedRequirements: 0,
       totalRequirements: areas.reduce((acc, a) => acc + a.requirements.length, 0),
-      progressPercentage: modoInstrutor ? (classe.instrucaoPercentage || 0) : classe.progress,
+      progressPercentage: isInstrutorMode ? (classe.instrucaoPercentage || 0) : classe.progress,
     };
     setSelectedClassProgress(classProgress);
 
     // Se modo instrutor, salvar o progresso de instrução
-    if (modoInstrutor) {
+    if (isInstrutorMode) {
       setInstrucaoProgress({
         total: areas.reduce((acc, a) => acc + a.requirements.length, 0),
         ensinados: classe.ensinadosCount || 0,
@@ -305,16 +329,6 @@ export default function ClassesPage() {
     carregarDados();
   };
 
-  const toggleModoInstrutor = async () => {
-    const novoModo = !modoInstrutor;
-    setModoInstrutor(novoModo);
-    // Reset progress quando muda modo
-    setInstrucaoProgress(null);
-    setSelectedClassProgress(null);
-    // Recarregar dados para buscar instruções
-    await carregarDados();
-  };
-
   if (isLoading) {
     return (
       <AppLayout title="Classes" subtitle="Classes regulares dos desbravadores">
@@ -325,7 +339,8 @@ export default function ClassesPage() {
     );
   }
 
-  const totalCompletions = classes.reduce((acc, c) => acc + (c.completedBy || 0), 0);
+  const filteredClasses = showAllClasses ? classes : classes.filter(c => classesQueInstrui.includes(c.id));
+  const totalCompletions = filteredClasses.reduce((acc, c) => acc + (c.completedBy || 0), 0);
 
   return (
     <AppLayout title="Classes" subtitle="Classes regulares dos desbravadores">
@@ -337,51 +352,31 @@ export default function ClassesPage() {
       >
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <AppStatsCard label="Classes" value={classes.length} icon={BookOpen} color="primary" />
+          <AppStatsCard label="Classes" value={filteredClasses.length} icon={BookOpen} color="primary" />
           <AppStatsCard label="Conclusões" value={totalCompletions} icon={Trophy} color="success" />
         </div>
 
-        {/* Modo Instrutor Toggle */}
-        <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
-          <div className="flex items-center gap-3">
-            <div className={cn("p-2 rounded-lg", modoInstrutor ? "bg-primary/20" : "bg-muted/30")}>
-              {modoInstrutor ? (
-                <GraduationCap className="w-5 h-5 text-primary" />
-              ) : (
-                <Users className="w-5 h-5 text-muted" />
-              )}
+        {/* Modo Instrutor */}
+        {isInstrutorMode && (
+          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
+            <div className="p-2 rounded-lg bg-primary/20">
+              <GraduationCap className="w-5 h-5 text-primary" />
             </div>
             <div>
               <p className="text-sm font-medium" style={{ color: 'var(--text-color)' }}>
-                {modoInstrutor ? 'Modo Instrutor' : 'Modo Membro'}
+                Modo Instrutor
               </p>
               <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>
-                {modoInstrutor
-                  ? 'Marque os requisitos que você ensinou'
-                  : 'Acompanhe o progresso dos membros'}
+                Marque os requisitos que você ensinou
               </p>
             </div>
           </div>
-          <button
-            onClick={toggleModoInstrutor}
-            className={cn(
-              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-              modoInstrutor ? "bg-primary" : "bg-muted"
-            )}
-          >
-            <span
-              className={cn(
-                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                modoInstrutor ? "translate-x-6" : "translate-x-1"
-              )}
-            />
-          </button>
-        </div>
+        )}
 
         {/* Instrução Stats (only in instrutor mode) */}
-        {modoInstrutor && (
+        {isInstrutorMode && (
           <div className="grid grid-cols-3 gap-3">
-            {classes.map((classe) => (
+            {filteredClasses.map((classe) => (
               <div
                 key={classe.id}
                 className="p-3 rounded-xl text-center"
@@ -401,7 +396,7 @@ export default function ClassesPage() {
         <div>
           <h3 className="text-lg font-semibold text-text-primary mb-3">Todas as Classes</h3>
           <div className="space-y-3">
-            {classes.map((classe, index) => (
+            {filteredClasses.map((classe, index) => (
               <motion.div
                 key={classe.id}
                 variants={{
@@ -436,7 +431,7 @@ export default function ClassesPage() {
                       </div>
                       <p className="text-sm text-muted line-clamp-1">{classe.descricao}</p>
                       <div className="flex items-center gap-4 mt-2">
-                        {modoInstrutor ? (
+                        {isInstrutorMode ? (
                           <>
                             <div className="flex items-center gap-1 text-xs text-primary">
                               <GraduationCap className="w-3 h-3" />
@@ -463,7 +458,7 @@ export default function ClassesPage() {
                     </div>
                     <div className="flex items-center justify-center">
                       <ProgressCircle
-                        value={modoInstrutor ? (classe.instrucaoPercentage || 0) : (classe.progress || 0)}
+                        value={isInstrutorMode ? (classe.instrucaoPercentage || 0) : (classe.progress || 0)}
                         size="md"
                         color={classe.cor}
                       />
@@ -659,8 +654,8 @@ export default function ClassesPage() {
         onClose={handleRequirementsModalClose}
         initialProgress={selectedClassProgress || selectedMemberProgress}
         onSaveProgress={selectedMemberProgress ? handleSaveProgress : undefined}
-        modoInstrutor={modoInstrutor}
-        onSalvarInstrucao={modoInstrutor && selectedClassProgress ? handleSalvarInstrucao : undefined}
+        modoInstrutor={isInstrutorMode}
+        onSalvarInstrucao={isInstrutorMode && selectedClassProgress ? handleSalvarInstrucao : undefined}
         instrucaoProgress={instrucaoProgress || undefined}
       />
     </AppLayout>

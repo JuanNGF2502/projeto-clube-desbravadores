@@ -430,6 +430,7 @@ export interface CargoAtribuido {
   tipo: CargoTipo;
   dataAtribuicao: Date;
   unidadeId?: string;
+  classeId?: string;
   ativo: boolean;
   observacao?: string;
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Calendar, Phone, Mail, Shield, Users, Star, Clock, Award, History, ArrowUpRight, ArrowDownLeft, RefreshCw, GraduationCap, BadgeCheck, LogIn, LogOut, Pencil, ClipboardCheck, TrendingUp } from 'lucide-react';
+import { User, Calendar, Phone, Mail, Shield, Users, Star, Clock, Award, History, ArrowUpRight, ArrowDownLeft, RefreshCw, GraduationCap, BadgeCheck, LogIn, LogOut, Pencil, ClipboardCheck, TrendingUp, KeyRound } from 'lucide-react';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
@@ -17,13 +17,17 @@ import {
   Transicao,
   TipoTransicao,
 } from '@/types';
-import { getTransicoesPorMembro } from '@/lib/queries';
+import { getTransicoesPorMembro, concluirClasse, createTransicao } from '@/lib/queries';
 import { getHistoricoAvaliacoesMembro, getEstatisticasAvaliacaoMembro } from '@/lib/queries/avaliacoes';
+import { useToast } from '@/components/ui/Toast';
+import { useAuth } from '@/hooks/useAuth';
+import { CriarAcessoModal } from './CriarAcessoModal';
 
 interface MembroDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEdit?: (membro: Usuario) => void;
+  onUpdate?: () => void;
   membro: Usuario | null;
   unidadeCores?: string[];
 }
@@ -32,6 +36,7 @@ export function MembroDetailModal({
   isOpen,
   onClose,
   onEdit,
+  onUpdate,
   membro,
   unidadeCores,
 }: MembroDetailModalProps) {
@@ -40,6 +45,32 @@ export function MembroDetailModal({
   const [historicoAvaliacoes, setHistoricoAvaliacoes] = useState<any[]>([]);
   const [estatisticasAvaliacao, setEstatisticasAvaliacao] = useState<any>(null);
   const [carregandoAvaliacoes, setCarregandoAvaliacoes] = useState(false);
+  const [concluindoClasse, setConcluindoClasse] = useState<string | null>(null);
+  const [showCriarAcesso, setShowCriarAcesso] = useState(false);
+  const { addToast } = useToast();
+  const { isAdmin } = useAuth();
+
+  const handleConcluirClasse = async (classeId: string) => {
+    if (!membro) return;
+    try {
+      setConcluindoClasse(classeId);
+      await concluirClasse(membro.id, classeId);
+      await createTransicao({
+        membro_id: membro.id,
+        tipo: 'CONCLUIU_CLASSE',
+        descricao: `Concluiu a classe ${getClasseById(classeId)?.nome || classeId}`,
+        classe_id: classeId,
+      });
+      addToast({ type: 'success', title: 'Classe concluída!', message: 'Parabéns pela conclusão!' });
+      await carregarTransicoes(membro.id);
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Erro ao concluir classe:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao concluir classe' });
+    } finally {
+      setConcluindoClasse(null);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && membro?.id) {
@@ -129,6 +160,12 @@ export function MembroDetailModal({
             <AppButton variant="ghost" size="sm" onClick={() => onEdit(membro)}>
               <Pencil className="w-4 h-4" />
               Editar
+            </AppButton>
+          )}
+          {isAdmin && (
+            <AppButton variant="ghost" size="sm" onClick={() => setShowCriarAcesso(true)}>
+              <KeyRound className="w-4 h-4" />
+              Criar Acesso
             </AppButton>
           )}
         </div>
@@ -258,6 +295,16 @@ export function MembroDetailModal({
                         />
                       )}
                       <span className="font-medium text-text-primary">{classe.nome}</span>
+                      <AppButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleConcluirClasse(classe.id)}
+                        isLoading={concluindoClasse === classe.id}
+                        className="ml-1"
+                        title="Concluir classe"
+                      >
+                        <BadgeCheck className="w-4 h-4 text-success" />
+                      </AppButton>
                     </div>
                   ))}
                 </div>
@@ -452,6 +499,17 @@ export function MembroDetailModal({
           )}
         </AppCard>
       </div>
+
+      <CriarAcessoModal
+        isOpen={showCriarAcesso}
+        onClose={() => setShowCriarAcesso(false)}
+        membroNome={membro.nome}
+        membroId={membro.id}
+        onSuccess={() => {
+          setShowCriarAcesso(false);
+          if (onUpdate) onUpdate();
+        }}
+      />
     </AppModal>
   );
 }

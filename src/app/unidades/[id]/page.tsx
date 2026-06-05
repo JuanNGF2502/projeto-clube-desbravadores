@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { useCallback } from 'react';
 import { Users, Calendar, User, Home, Trophy, ChevronRight, Loader2, ClipboardCheck } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { UnitHeader, TabsNavigation, ScoreCard, RankingModal } from '@/components/unidades';
@@ -15,10 +16,9 @@ import { useToast } from '@/components/ui/Toast';
 import { Usuario } from '@/types';
 import { getUnidadeById, getMembrosPorUnidade } from '@/lib/queries';
 import { getClasseById } from '@/lib/queries/classes';
-import { getEstatisticasUnidade } from '@/lib/queries/dashboard';
+import { getEstatisticasUnidade, getAtividadeRecente } from '@/lib/queries/dashboard';
 import { DEFAULT_CLASSES } from '@/types';
-
-const CLUB_ID = '00000000-0000-0000-0000-000000000001';
+import { useClubId } from '@/hooks';
 
 interface Tab {
   id: string;
@@ -36,6 +36,7 @@ interface Params {
 }
 
 export default function UnitDetailPage({ params }: { params: Promise<Params> }) {
+  const CLUB_ID = useClubId();
   const resolvedParams = use(params);
   const router = useRouter();
   const { addToast } = useToast();
@@ -47,39 +48,44 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
   const [showRanking, setShowRanking] = useState(false);
   const [selectedMembro, setSelectedMembro] = useState<Usuario | null>(null);
   const [estatisticasUnidade, setEstatisticasUnidade] = useState<any>(null);
+  const [atividadesRecentes, setAtividadesRecentes] = useState<any[]>([]);
+
+  const carregarDados = useCallback(async () => {
+    try {
+      setIsLoading(true);
+
+      // Buscar unidade
+      const unidadeData = await getUnidadeById(resolvedParams.id);
+      if (!unidadeData) {
+        addToast({ type: 'error', title: 'Erro', message: 'Unidade não encontrada' });
+        router.push('/unidades');
+        return;
+      }
+      setUnidade(unidadeData);
+
+      // Buscar membros
+      const membrosData = await getMembrosPorUnidade(resolvedParams.id);
+      setMembros(membrosData || []);
+
+      // Buscar estatísticas da unidade (inclui avaliações)
+      const statsData = await getEstatisticasUnidade(resolvedParams.id);
+      setEstatisticasUnidade(statsData);
+
+      // Buscar atividades recentes reais
+      const atividadesData = await getAtividadeRecente(CLUB_ID, 5);
+      setAtividadesRecentes(atividadesData);
+
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar dados da unidade' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [resolvedParams.id]);
 
   useEffect(() => {
-    const carregarDados = async () => {
-      try {
-        setIsLoading(true);
-
-        // Buscar unidade
-        const unidadeData = await getUnidadeById(resolvedParams.id);
-        if (!unidadeData) {
-          addToast({ type: 'error', title: 'Erro', message: 'Unidade não encontrada' });
-          router.push('/unidades');
-          return;
-        }
-        setUnidade(unidadeData);
-
-        // Buscar membros
-        const membrosData = await getMembrosPorUnidade(resolvedParams.id);
-        setMembros(membrosData || []);
-
-        // Buscar estatísticas da unidade (inclui avaliações)
-        const statsData = await getEstatisticasUnidade(resolvedParams.id);
-        setEstatisticasUnidade(statsData);
-
-      } catch (error) {
-        console.error('Erro ao carregar dados:', error);
-        addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar dados da unidade' });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     carregarDados();
-  }, [resolvedParams.id]);
+  }, [carregarDados]);
 
   if (isLoading) {
     return (
@@ -204,16 +210,21 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
             <AppCard padding="sm">
               <h3 className="text-sm font-semibold text-text-primary mb-3">Últimas Atividades</h3>
               <div className="space-y-2">
-                {[
-                  { text: 'Encontro semanal realizado', time: 'há 2 dias' },
-                  { text: 'Campismo no parque nacional', time: 'há 1 semana' },
-                  { text: 'Estudo bíblico em equipe', time: 'há 2 semanas' },
-                ].map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between py-2">
-                    <span className="text-sm text-text-primary">{activity.text}</span>
-                    <span className="text-xs text-muted">{activity.time}</span>
-                  </div>
-                ))}
+                {atividadesRecentes.length === 0 ? (
+                  <p className="text-sm text-muted text-center py-4">Nenhuma atividade recente</p>
+                ) : (
+                  atividadesRecentes.slice(0, 5).map((atv) => (
+                    <div key={atv.id} className="flex items-center justify-between py-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-text-primary">{atv.descricao}</span>
+                        <p className="text-xs text-muted">{atv.membro_nome}</p>
+                      </div>
+                      <span className="text-xs text-muted ml-2">
+                        {new Date(atv.data).toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </AppCard>
           </motion.div>
@@ -414,6 +425,7 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
       <MembroDetailModal
         isOpen={!!selectedMembro}
         onClose={() => setSelectedMembro(null)}
+        onUpdate={carregarDados}
         membro={selectedMembro}
         unidadeCores={unidade.cores || ['#3B82F6']}
       />

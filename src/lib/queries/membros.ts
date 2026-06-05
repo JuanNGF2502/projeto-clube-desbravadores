@@ -104,13 +104,12 @@ export async function getMembros(clubeId: string, filters?: MembroFilters) {
   // Busca cargos dos membros
   const { data: membrosCargos } = await supabase
     .from('membros_cargos')
-    .select('*, cargo:cargos(*)')
+    .select('*, cargo:cargos!cargo_tipo(*)')
     .in('membro_id', membroIds);
 
-  // Busca classes atuais dos membros
   const { data: membrosClassesAtuais } = await supabase
     .from('membros_classes_atuais')
-    .select('*, classe:classes(*)')
+    .select('*, classe:classes!classe_id(*)')
     .in('membro_id', membroIds);
 
   // Relaciona os dados
@@ -191,16 +190,21 @@ export async function deleteMembro(id: string) {
 // RELAÇÕES - CARGOS
 // ============================================
 
-export async function createMembroCargo(membroId: string, cargoTipo: string, unidadeId?: string | null) {
+export async function createMembroCargo(membroId: string, cargoTipo: string, unidadeId?: string | null, classeId?: string | null) {
+  const insertData: Record<string, any> = {
+    membro_id: membroId,
+    cargo_tipo: cargoTipo,
+    unidade_id: unidadeId,
+    data_atribuicao: new Date().toISOString().split('T')[0],
+    ativo: true,
+  };
+  if (classeId) {
+    insertData.classe_id = classeId;
+  }
+
   const { data, error } = await supabase
     .from('membros_cargos')
-    .insert({
-      membro_id: membroId,
-      cargo_tipo: cargoTipo,
-      unidade_id: unidadeId,
-      data_atribuicao: new Date().toISOString().split('T')[0],
-      ativo: true,
-    })
+    .insert(insertData)
     .select()
     .single();
 
@@ -228,7 +232,7 @@ export async function createMembroClasseAtual(membroId: string, classeId: string
 
   if (error) {
     console.error('Erro createMembroClasseAtual:', error);
-    throw error;
+    return null;
   }
   return data;
 }
@@ -260,9 +264,12 @@ export async function createMembroUnidade(membroId: string, unidadeId: string) {
 export async function deleteMembroCargos(membroId: string) {
   const { error } = await supabase
     .from('membros_cargos')
-    .delete()
+    .update({ ativo: false })
     .eq('membro_id', membroId);
-  if (error) console.error('Erro deleteMembroCargos:', error);
+  if (error) {
+    console.error('Erro desativar cargos:', error);
+    throw error;
+  }
 }
 
 export async function deleteMembroClassesAtuais(membroId: string) {
@@ -542,6 +549,15 @@ export async function addCargo(membroId: string, cargoTipo: string, unidadeId?: 
   return data;
 }
 
+export async function syncProfileFromMembro(membroId: string) {
+  const { error } = await supabase.rpc('sync_profile_from_membro', {
+    p_membro_id: membroId,
+  });
+  if (error) {
+    console.error('Erro syncProfileFromMembro:', error);
+  }
+}
+
 export async function removeCargo(membroId: string, cargoTipo: string) {
   const { error } = await supabase
     .from('membros_cargos')
@@ -550,4 +566,36 @@ export async function removeCargo(membroId: string, cargoTipo: string) {
     .eq('cargo_tipo', cargoTipo);
 
   if (error) throw error;
+}
+
+export async function getClassesQueInstrutorEnsinaPorCargo(membroId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('membros_cargos')
+    .select('classe_id')
+    .eq('membro_id', membroId)
+    .eq('cargo_tipo', 'INSTRUTOR_CLASSE')
+    .eq('ativo', true)
+    .not('classe_id', 'is', null);
+
+  if (error) {
+    console.error('Erro getClassesQueInstrutorEnsinaPorCargo:', error);
+    return [];
+  }
+  return data?.map(d => d.classe_id) || [];
+}
+
+export async function getUnidadesQueConselheiroOrienta(membroId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('membros_cargos')
+    .select('unidade_id')
+    .eq('membro_id', membroId)
+    .in('cargo_tipo', ['CONSELHEIRO', 'CONSELHEIRO_ASSOC'])
+    .eq('ativo', true)
+    .not('unidade_id', 'is', null);
+
+  if (error) {
+    console.error('Erro getUnidadesQueConselheiroOrienta:', error);
+    return [];
+  }
+  return data?.map(d => d.unidade_id) || [];
 }

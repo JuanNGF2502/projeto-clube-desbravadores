@@ -17,9 +17,8 @@ import { useToast } from '@/components/ui/Toast';
 import { Unit, UNIT_GENDERS, DEFAULT_UNIT_COLORS } from '@/types';
 import { cn } from '@/utils/cn';
 import { getUnidadesByClube, createUnidade, updateUnidade, getRankingUnidades } from '@/lib/queries';
-
-// ID fixo para desenvolvimento - em produção viria do auth
-const CLUB_ID = '00000000-0000-0000-0000-000000000001';
+import { useClubId, useAuth } from '@/hooks';
+import { getUnidadesQueConselheiroOrienta } from '@/lib/queries/membros';
 
 interface FormData {
   nome: string;
@@ -32,9 +31,12 @@ interface FormData {
 }
 
 export default function UnitsPage() {
+  const CLUB_ID = useClubId();
+  const { user, profile } = useAuth();
   const [units, setUnits] = useState<Unit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [unidadesQueOrienta, setUnidadesQueOrienta] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [formData, setFormData] = useState<FormData>({
@@ -85,12 +87,34 @@ export default function UnitsPage() {
     buscarRanking();
   }, []);
 
+  useEffect(() => {
+    if (user && profile) {
+      if (profile.role !== 'ADMIN' && profile.role !== 'DIRIGENTE' && profile.membro_id) {
+        getUnidadesQueConselheiroOrienta(profile.membro_id).then(ids => {
+          setUnidadesQueOrienta(ids);
+        }).catch(() => {
+          setUnidadesQueOrienta([]);
+        });
+      } else {
+        setUnidadesQueOrienta([]);
+      }
+    }
+  }, [user, profile]);
+
+  const showAllUnits = profile?.role === 'ADMIN' || profile?.role === 'DIRIGENTE' || unidadesQueOrienta.length === 0;
+
   const filteredUnits = useMemo(() => {
-    if (!search) return units;
-    return units.filter((unit) =>
-      unit.nome.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [units, search]);
+    let result = units;
+    if (!showAllUnits && unidadesQueOrienta.length > 0) {
+      result = result.filter(u => unidadesQueOrienta.includes(u.id));
+    }
+    if (search) {
+      result = result.filter((unit) =>
+        unit.nome.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    return result;
+  }, [units, search, unidadesQueOrienta, showAllUnits]);
 
   const handleSave = async () => {
     if (!formData.nome.trim()) {
@@ -180,17 +204,37 @@ export default function UnitsPage() {
     );
   }
 
+  const canManageUnits = profile?.role === 'ADMIN' || profile?.role === 'DIRIGENTE';
+
   return (
     <AppLayout
       title="Unidades"
-      subtitle={`${units.length} unidades cadastradas`}
+      subtitle={`${filteredUnits.length}${!showAllUnits ? ` de ${units.length}` : ''} unidades`}
       actions={
-        <AppButton variant="primary" size="sm" onClick={openCreateModal}>
-          <Users className="w-4 h-4 mr-1" />
-          Nova
-        </AppButton>
+        canManageUnits ? (
+          <AppButton variant="primary" size="sm" onClick={openCreateModal}>
+            <Users className="w-4 h-4 mr-1" />
+            Nova
+          </AppButton>
+        ) : undefined
       }
     >
+      {!showAllUnits && unidadesQueOrienta.length > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
+          <div className="p-2 rounded-lg bg-primary/20">
+            <Users className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-color)' }}>
+              Modo Conselheiro
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary-color)' }}>
+              Você vê apenas as unidades que orienta
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2 mb-4">
         <AppInput
           placeholder="Buscar unidade..."

@@ -1,0 +1,327 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Plus, Search, Pencil, Trash2, Award, Loader2, Save, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { AppCard } from '@/components/ui/AppCard';
+import { AppButton } from '@/components/ui/AppButton';
+import { AppInput } from '@/components/ui/AppInput';
+import { AppTextarea } from '@/components/ui/AppInput';
+import { AppModal } from '@/components/ui/AppModal';
+import { AppBadge } from '@/components/ui/AppBadge';
+import { AppEmptyState } from '@/components/ui/AppEmptyState';
+import { useToast } from '@/components/ui/Toast';
+import { supabase } from '@/lib/supabase';
+import { SPECIALTY_CATEGORIES, type EspecialidadeCategoria } from '@/types';
+import { cn } from '@/utils/cn';
+
+interface Especialidade {
+  id: string;
+  nome: string;
+  categoria: string;
+  descricao?: string;
+  nivel: number;
+  imagem?: string;
+  ativo: boolean;
+}
+
+export default function EspecialidadesPage() {
+  const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEsp, setEditingEsp] = useState<Especialidade | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('TODAS');
+  const [formData, setFormData] = useState({
+    nome: '',
+    categoria: SPECIALTY_CATEGORIES[0],
+    descricao: '',
+    nivel: 1,
+  });
+  const { addToast } = useToast();
+
+  const carregarDados = async () => {
+    try {
+      setIsLoading(true);
+      let query = supabase
+        .from('especialidades')
+        .select('*')
+        .order('nome');
+
+      if (filtroCategoria !== 'TODAS') {
+        query = query.eq('categoria', filtroCategoria);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setEspecialidades(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar especialidades:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar especialidades' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, [filtroCategoria]);
+
+  const filtered = especialidades.filter(e =>
+    e.nome.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleOpenModal = (esp?: Especialidade) => {
+    if (esp) {
+      setEditingEsp(esp);
+      setFormData({
+        nome: esp.nome,
+        categoria: esp.categoria as EspecialidadeCategoria,
+        descricao: esp.descricao || '',
+        nivel: esp.nivel,
+      });
+    } else {
+      setEditingEsp(null);
+      setFormData({ nome: '', categoria: SPECIALTY_CATEGORIES[0], descricao: '', nivel: 1 });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!formData.nome.trim()) {
+      addToast({ type: 'error', title: 'Erro', message: 'Nome é obrigatório' });
+      return;
+    }
+    try {
+      setSaving(true);
+      if (editingEsp) {
+        const { error } = await supabase
+          .from('especialidades')
+          .update({
+            nome: formData.nome,
+            categoria: formData.categoria,
+            descricao: formData.descricao || null,
+            nivel: formData.nivel,
+          })
+          .eq('id', editingEsp.id);
+        if (error) throw error;
+        addToast({ type: 'success', title: 'Sucesso', message: 'Especialidade atualizada' });
+      } else {
+        const { error } = await supabase
+          .from('especialidades')
+          .insert({
+            nome: formData.nome,
+            categoria: formData.categoria,
+            descricao: formData.descricao || null,
+            nivel: formData.nivel,
+            ativo: true,
+          });
+        if (error) throw error;
+        addToast({ type: 'success', title: 'Sucesso', message: 'Especialidade criada' });
+      }
+      setIsModalOpen(false);
+      setEditingEsp(null);
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar especialidade' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (esp: Especialidade) => {
+    if (!confirm(`Excluir "${esp.nome}" permanentemente?`)) return;
+    try {
+      const { error } = await supabase
+        .from('especialidades')
+        .delete()
+        .eq('id', esp.id);
+      if (error) throw error;
+      addToast({ type: 'success', title: 'Sucesso', message: 'Especialidade excluída' });
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao excluir:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao excluir especialidade' });
+    }
+  };
+
+  const getNivelLabel = (nivel: number) => {
+    const labels: Record<number, string> = { 1: 'Básico', 2: 'Intermediário', 3: 'Avançado' };
+    return labels[nivel] || 'Básico';
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout title="Especialidades" subtitle="Gerenciamento de especialidades">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout
+      title="Especialidades"
+      subtitle={`${especialidades.length} especialidades cadastradas`}
+      actions={
+        <AppButton variant="primary" size="sm" onClick={() => handleOpenModal()}>
+          <Plus className="w-4 h-4 mr-1" />
+          Nova
+        </AppButton>
+      }
+    >
+      <div className="space-y-4">
+        {/* Filtro de categoria */}
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          <button
+            onClick={() => setFiltroCategoria('TODAS')}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors',
+              filtroCategoria === 'TODAS' ? 'bg-primary text-white' : 'bg-surface text-muted'
+            )}
+          >
+            Todas
+          </button>
+          {SPECIALTY_CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setFiltroCategoria(cat)}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors',
+                filtroCategoria === cat ? 'bg-primary text-white' : 'bg-surface text-muted'
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Busca */}
+        <AppInput
+          placeholder="Buscar especialidade..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          leftIcon={<Search className="w-4 h-4" />}
+        />
+
+        {/* Lista */}
+        {filtered.length === 0 ? (
+          <AppEmptyState
+            icon={<Award className="w-10 h-10 text-primary" />}
+            title="Nenhuma especialidade encontrada"
+            description="Cadastre a primeira especialidade para começar."
+            action={{ label: 'Nova Especialidade', onClick: () => handleOpenModal() }}
+          />
+        ) : (
+          <div className="space-y-2">
+            {filtered.map((esp, index) => (
+              <motion.div
+                key={esp.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03 }}
+              >
+                <AppCard hover className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <Award className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-text-primary">{esp.nome}</h4>
+                        <AppBadge size="sm" variant="primary">
+                          {esp.categoria}
+                        </AppBadge>
+                        <AppBadge size="sm" variant={esp.nivel === 3 ? 'warning' : esp.nivel === 2 ? 'info' : 'secondary'}>
+                          {getNivelLabel(esp.nivel)}
+                        </AppBadge>
+                      </div>
+                      {esp.descricao && (
+                        <p className="text-xs text-muted mt-1 line-clamp-1">{esp.descricao}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <AppButton variant="ghost" size="sm" onClick={() => handleOpenModal(esp)}>
+                        <Pencil className="w-4 h-4" />
+                      </AppButton>
+                      <AppButton variant="ghost" size="sm" onClick={() => handleDelete(esp)}>
+                        <Trash2 className="w-4 h-4 text-danger" />
+                      </AppButton>
+                    </div>
+                  </div>
+                </AppCard>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      <AppModal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setEditingEsp(null); }}
+        title={editingEsp ? 'Editar Especialidade' : 'Nova Especialidade'}
+        size="md"
+      >
+        <div className="space-y-4">
+          <AppInput
+            label="Nome *"
+            placeholder="Ex: Primeiros Socorros"
+            value={formData.nome}
+            onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+          />
+          <div>
+            <label className="text-sm font-medium mb-1 block">Categoria *</label>
+            <select
+              value={formData.categoria}
+              onChange={(e) => setFormData({ ...formData, categoria: e.target.value as EspecialidadeCategoria })}
+              className="w-full p-3 rounded-xl border border-border bg-card text-text-primary"
+            >
+              {SPECIALTY_CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Nível *</label>
+            <div className="flex gap-2">
+              {[1, 2, 3].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, nivel: n })}
+                  className={cn(
+                    'flex-1 py-2.5 rounded-xl text-sm font-medium transition-all',
+                    formData.nivel === n ? 'bg-primary text-white' : 'border bg-card text-muted'
+                  )}
+                >
+                  {getNivelLabel(n)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <AppTextarea
+            label="Descrição"
+            placeholder="Descrição da especialidade..."
+            value={formData.descricao}
+            onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+            rows={3}
+          />
+          <div className="flex gap-3 pt-2">
+            <AppButton variant="secondary" onClick={() => { setIsModalOpen(false); setEditingEsp(null); }} className="flex-1">
+              Cancelar
+            </AppButton>
+            <AppButton onClick={handleSave} isLoading={saving} className="flex-1">
+              <Save className="w-4 h-4 mr-1" />
+              {editingEsp ? 'Salvar' : 'Criar'}
+            </AppButton>
+          </div>
+        </div>
+      </AppModal>
+    </AppLayout>
+  );
+}

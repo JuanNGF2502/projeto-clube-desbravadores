@@ -23,9 +23,7 @@ import {
   toggleUnidadeAtivo
 } from '@/lib/queries';
 import { supabase } from '@/lib/supabase';
-
-// ID fixo para desenvolvimento
-const CLUB_ID = '00000000-0000-0000-0000-000000000001';
+import { useClubId } from '@/hooks';
 
 interface UnitFormData {
   nome: string;
@@ -37,6 +35,7 @@ interface UnitFormData {
 }
 
 export default function GerenciarUnidadesPage() {
+  const CLUB_ID = useClubId();
   const [units, setUnits] = useState<Unit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);

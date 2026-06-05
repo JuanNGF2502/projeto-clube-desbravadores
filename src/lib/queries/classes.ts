@@ -419,6 +419,18 @@ export async function salvarInstrucaoRequisito(
   return data;
 }
 
+// Buscar classes que um instrutor ensina (pelo instrutor_id)
+export async function getClassesQueInstrutorEnsina(instrutorId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('classes_instrucoes')
+    .select('classe_id')
+    .eq('instrutor_id', instrutorId);
+
+  if (error) throw error;
+  const classesUnicas = [...new Set(data?.map(d => d.classe_id) || [])];
+  return classesUnicas;
+}
+
 // Buscar progresso de instrução da classe (para a UI)
 export async function getProgressoInstrucaoClasse(
   classeId: string
