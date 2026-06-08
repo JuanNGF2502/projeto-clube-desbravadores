@@ -97,7 +97,7 @@ export function AppLayout({
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-24">
+      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 16px))' }}>
         <Breadcrumbs />
         <motion.div
           initial={{ opacity: 0, y: 10 }}

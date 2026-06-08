@@ -42,6 +42,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Supabase local
+supabase/.temp/
+
 # IDE
 .idea/
 .vscode/

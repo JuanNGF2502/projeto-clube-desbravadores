@@ -295,32 +295,35 @@ export function RankingModal({
       scrollable
     >
       {/* Header Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <AppCard padding="sm" className="text-center">
-          <p className="text-xs text-muted mb-1">Total da Unidade</p>
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="rounded-xl bg-card border border-border p-3 text-center">
+          <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-1">Total</p>
           {isLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin mx-auto text-primary" />
+            <Loader2 className="w-4 h-4 animate-spin mx-auto text-primary" />
           ) : (
-            <p className="text-xl font-bold text-primary">{totalUnidade}</p>
+            <p className="text-lg font-bold text-primary leading-none">{totalUnidade}</p>
           )}
-        </AppCard>
-        <AppCard padding="sm" className="text-center">
-          <p className="text-xs text-muted mb-1">Média</p>
+          <p className="text-[10px] text-muted mt-0.5">pts</p>
+        </div>
+        <div className="rounded-xl bg-card border border-border p-3 text-center">
+          <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-1">Média</p>
           {isLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin mx-auto text-success" />
+            <Loader2 className="w-4 h-4 animate-spin mx-auto text-success" />
           ) : (
-            <p className="text-xl font-bold text-success">{mediaUnidade}</p>
+            <p className="text-lg font-bold text-success leading-none">{mediaUnidade}</p>
           )}
-        </AppCard>
-        <AppCard padding="sm" className="text-center">
-          <p className="text-xs text-muted mb-1">Última Avaliação</p>
-          <p className="text-sm font-bold text-text-primary flex items-center justify-center gap-1">
+          <p className="text-[10px] text-muted mt-0.5">pts</p>
+        </div>
+        <div className="rounded-xl bg-card border border-border p-3 text-center">
+          <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-1">Última</p>
+          <p className="text-sm font-bold text-text-primary leading-none flex items-center justify-center gap-1">
             <Calendar className="w-3 h-3" />
             {ultimaAvaliacao
               ? new Date(ultimaAvaliacao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
               : '—'}
           </p>
-        </AppCard>
+          <p className="text-[10px] text-muted mt-0.5">avaliação</p>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -368,6 +371,7 @@ export function RankingModal({
               >
                 {dadosExibir.map((membro, index) => {
                   const classInfo = getClassificacaoInfo(membro.classificacao);
+                  const isPodium = index < 3;
                   return (
                     <motion.div
                       key={membro.id}
@@ -377,59 +381,75 @@ export function RankingModal({
                     >
                       <AppCard
                         hover
+                        padding="sm"
                         className={cn(
                           'flex items-center gap-3 transition-all',
-                          index === 0 && 'ring-2 ring-yellow-400/50'
+                          isPodium && 'border-l-4',
+                          index === 0 && 'border-l-yellow-400 ring-1 ring-yellow-400/30',
+                          index === 1 && 'border-l-gray-400',
+                          index === 2 && 'border-l-amber-600',
                         )}
                       >
-                        {/* Posição */}
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted/20">
-                          {getMedalha(index + 1)}
-                        </div>
-
-                        {/* Avatar */}
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                          style={{
-                            background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2] || unidadeCores[0]})`,
-                          }}
-                        >
-                          {membro.foto ? (
-                            <img src={membro.foto} alt={membro.nome} className="w-full h-full rounded-full object-cover" />
-                          ) : (
-                            <span className="text-white font-bold text-sm">
-                              {membro.nome.charAt(0)}
-                            </span>
-                          )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium text-text-primary truncate">
-                            {membro.nome}
-                          </h4>
-                          <AppBadge
-                            size="sm"
-                            color={classInfo.cor}
-                            className="text-white"
+                        {/* Avatar com posição sobreposta */}
+                        <div className="relative flex-shrink-0">
+                          <div
+                            className="w-12 h-12 rounded-full flex items-center justify-center"
+                            style={{
+                              background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2] || unidadeCores[0]})`,
+                            }}
                           >
-                            {classInfo.label}
-                          </AppBadge>
+                            {membro.foto ? (
+                              <img src={membro.foto} alt={membro.nome} className="w-full h-full rounded-full object-cover" />
+                            ) : (
+                              <span className="text-white font-bold text-lg">
+                                {membro.nome.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          {isPodium ? (
+                            <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center shadow-lg shadow-yellow-400/30">
+                              {index === 0 ? (
+                                <Trophy className="w-3.5 h-3.5 text-white" />
+                              ) : (
+                                <Medal className="w-3.5 h-3.5 text-white" />
+                              )}
+                            </div>
+                          ) : (
+                            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-muted/30 flex items-center justify-center border-2 border-card">
+                              <span className="text-[10px] font-bold text-muted">{index + 1}</span>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-xs text-muted">{(membro as any).cargo || (membro as any).funcao || 'Desbravador'}</p>
-                      </div>
 
-                      {/* Pontos */}
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-text-primary">{membro.totalPontos}</p>
-                        <p className="text-xs text-muted">pontos</p>
-                      </div>
-                    </AppCard>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="font-semibold text-sm text-text-primary leading-tight">
+                              {membro.nome}
+                            </h4>
+                            <AppBadge
+                              size="sm"
+                              color={classInfo.cor}
+                              className="text-white"
+                            >
+                              {classInfo.label}
+                            </AppBadge>
+                          </div>
+                          <p className="text-xs text-muted mt-0.5">
+                            {(membro as any).cargo || (membro as any).funcao || 'Desbravador'}
+                          </p>
+                        </div>
+
+                        {/* Pontos */}
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-xl font-bold text-text-primary leading-none">{membro.totalPontos}</p>
+                          <p className="text-[10px] text-muted mt-0.5">pts</p>
+                        </div>
+                      </AppCard>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
           ) : showResults ? (
             <motion.div
               key="results"
@@ -640,17 +660,17 @@ export function RankingModal({
       </div>
 
       {/* Legenda */}
-      <div className="mt-4 pt-4 border-t border-border">
-        <p className="text-xs text-muted mb-2">Classificação:</p>
-        <div className="flex gap-3">
+      <div className="mt-3 pt-3 border-t border-border">
+        <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-2">Classificação</p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
           {CLASSIFICACOES.map((c) => (
-            <div key={c.nivel} className="flex items-center gap-1">
+            <div key={c.nivel} className="flex items-center gap-1.5">
               <div
-                className="w-3 h-3 rounded-full"
+                className="w-2.5 h-2.5 rounded-full ring-1 ring-black/10"
                 style={{ backgroundColor: c.cor }}
               />
               <span className="text-xs text-muted">
-                {c.label} ({c.min}-{c.max})
+                {c.label}
               </span>
             </div>
           ))}

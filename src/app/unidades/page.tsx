@@ -210,14 +210,7 @@ export default function UnitsPage() {
     <AppLayout
       title="Unidades"
       subtitle={`${filteredUnits.length}${!podeGerenciarUnidades ? ` de ${units.length}` : ''} unidades`}
-      actions={
-        canManageUnits ? (
-          <AppButton variant="primary" size="sm" onClick={openCreateModal}>
-            <Users className="w-4 h-4 mr-1" />
-            Nova
-          </AppButton>
-        ) : undefined
-      }
+      
     >
       {!podeGerenciarUnidades && unidadesQueOrienta.length > 0 && (
         <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
@@ -243,14 +236,7 @@ export default function UnitsPage() {
           leftIcon={<Search className="w-4 h-4" />}
           className="flex-1"
         />
-        <AppButton
-          variant="secondary"
-          onClick={() => router.push('/unidades/gerenciar')}
-          className="flex-shrink-0"
-          title="Gerenciar unidades"
-        >
-          <Settings className="w-5 h-5" />
-        </AppButton>
+        
       </div>
 
       {filteredUnits.length === 0 ? (

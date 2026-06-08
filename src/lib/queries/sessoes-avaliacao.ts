@@ -57,6 +57,19 @@ export async function ativarSessao(sessaoId: string, ativo: boolean): Promise<vo
   if (error) throw error;
 }
 
+export async function updateSessao(sessaoId: string, dataReuniao: string): Promise<void> {
+  const { error, data } = await supabase
+    .from('sessoes_avaliacao')
+    .update({ data_reuniao: dataReuniao })
+    .eq('id', sessaoId)
+    .select();
+
+  if (error) {
+    console.error('Erro updateSessao:', error, { sessaoId, dataReuniao });
+    throw error;
+  }
+}
+
 export async function deleteSessao(sessaoId: string): Promise<void> {
   const { error } = await supabase
     .from('sessoes_avaliacao')

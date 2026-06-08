@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Pencil, Trash2, Award, Loader2, Save, UserPlus, X, Check, Users } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Award, Loader2, Save, UserPlus, X, Check, Users, RotateCcw } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -15,7 +15,7 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase/client';
 import { SPECIALTY_CATEGORIES, type EspecialidadeCategoria } from '@/types';
 import { cn } from '@/utils/cn';
-import { getMembrosDisponiveis, getMembrosPorEspecialidade, atribuirEspecialidade, removerEspecialidade } from '@/lib/queries/especialidades';
+import { getMembrosDisponiveis, getMembrosPorEspecialidade, atribuirEspecialidade, removerEspecialidade, updateProgressoEspecialidade } from '@/lib/queries/especialidades';
 import { useClubId } from '@/hooks';
 
 interface Especialidade {
@@ -439,13 +439,37 @@ export default function EspecialidadesPage() {
                         </p>
                       </div>
                     </div>
-                    <AppButton
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoverAtribuicao(ma.membro_id)}
-                    >
-                      <X className="w-4 h-4 text-danger" />
-                    </AppButton>
+                    <div className="flex items-center gap-1">
+                      <AppButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          if (!assignEsp) return;
+                          await updateProgressoEspecialidade(ma.membro_id, assignEsp.id, !ma.concluido);
+                          const atribuidos = await getMembrosPorEspecialidade(assignEsp.id);
+                          setMembrosAtribuidos(atribuidos);
+                          addToast({
+                            type: ma.concluido ? 'warning' : 'success',
+                            title: ma.concluido ? 'Desmarcado' : 'Concluída',
+                            message: `${ma.membro?.nome || 'Membro'} ${ma.concluido ? 'teve conclusão removida' : 'completou a especialidade'}`,
+                          });
+                        }}
+                        title={ma.concluido ? 'Desmarcar conclusão' : 'Marcar como concluída'}
+                      >
+                        {ma.concluido ? (
+                          <RotateCcw className="w-4 h-4 text-warning" />
+                        ) : (
+                          <Check className="w-4 h-4 text-success" />
+                        )}
+                      </AppButton>
+                      <AppButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoverAtribuicao(ma.membro_id)}
+                      >
+                        <X className="w-4 h-4 text-danger" />
+                      </AppButton>
+                    </div>
                   </div>
                 ))}
               </div>

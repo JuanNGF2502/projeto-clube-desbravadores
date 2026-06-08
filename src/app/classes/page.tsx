@@ -12,13 +12,14 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppStatsCard } from '@/components/ui/AppStatsCard';
 import { ProgressCircle } from '@/components/ui/ProgressCircle';
 import { useToast } from '@/components/ui/Toast';
-import { DEFAULT_CLASSES, Classe } from '@/types';
+import { Classe } from '@/types';
 import { ClassRequirementsPopup } from '@/components/classes';
-import { getClasses, getEstatisticasClasse, getRequisitosPorClasse, getMembrosComProgresso, RequisitoClasse, MembroComProgresso, updateProgressoRequisito, getStatusInstrucaoPorClasse, salvarInstrucaoRequisito, getProgressoInstrucaoClasse, getClassesQueInstrutorEnsina } from '@/lib/queries/classes';
+import { getClasses, RequisitoClasse, MembroComProgresso, updateProgressoRequisito, salvarInstrucaoRequisito, getClassesQueInstrutorEnsina } from '@/lib/queries/classes';
 import { getClassesQueInstrutorEnsinaPorCargo } from '@/lib/queries/membros';
-import { getMembrosPorClasse } from '@/lib/queries/dashboard';
 import { useClubId, useAuth } from '@/hooks';
 import { concluirClasse, createTransicao } from '@/lib/queries';
+import { supabase } from '@/lib/supabase/client';
+import { batchInQuery } from '@/lib/supabase/batch';
 
 interface MemberClassProgress {
   memberId: string;
@@ -137,73 +138,189 @@ export default function ClassesPage() {
     try {
       setIsLoading(true);
 
-      // Buscar classes do banco
+      // 1. Buscar todas as classes
       const classesData = await getClasses(true);
+      const todasClasses = classesData || [];
+      const todosClassIds = todasClasses.map(c => c.id);
 
-      // Converter para formato da UI
-      const classesFormatadas = await Promise.all(
-        (classesData || []).map(async (classe: any) => {
-          // Buscar estatísticas da classe
-          const stats = await getEstatisticasClasse(classe.id);
+      // 2. Buscar membros em classes (para filtrar classes com desbravadores)
+      const { data: membrosClasses } = await supabase
+        .from('membros_classes_atuais')
+        .select('membro_id, classe_id');
 
-          // Buscar requisitos
-          const requisitos = await getRequisitosPorClasse(classe.id);
+      const classesComMembros = new Set(membrosClasses?.map(mc => mc.classe_id) || []);
+      const classesFiltradas = todasClasses.filter(c => classesComMembros.has(c.id));
+      const classIds = classesFiltradas.map(c => c.id);
 
-          // Buscar membros com progresso nesta classe
-          const membrosComProgresso = await getMembrosComProgresso(clubId, classe.id);
+      if (classIds.length === 0) {
+        setClasses([]);
+        return;
+      }
 
-          // Buscar contagem de membros
-          const membrosData = await getMembrosPorClasse(clubId);
-          const membrosNaClasse = membrosData?.find(m => m.classeId === classe.id);
+      // 3. Buscar TODOS os requisitos das classes relevantes (1 query)
+      const { data: todosRequisitos } = await supabase
+        .from('requisitos_classe')
+        .select('*')
+        .in('classe_id', classIds)
+        .eq('ativo', true)
+        .order('ordem');
 
-          // Buscar progresso de instrução
-          const instrucao = await getProgressoInstrucaoClasse(classe.id);
+      const requisitosPorClasse: Record<string, any[]> = {};
+      const seenRequisitos = new Set<string>();
+      (todosRequisitos || []).forEach(req => {
+        const key = `${req.classe_id}_${req.area}_${req.ordem}`;
+        if (seenRequisitos.has(key)) return;
+        seenRequisitos.add(key);
+        if (!requisitosPorClasse[req.classe_id]) requisitosPorClasse[req.classe_id] = [];
+        requisitosPorClasse[req.classe_id].push(req);
+      });
 
-          // Buscar status de instrução dos requisitos
-          const statusInstrucao = await getStatusInstrucaoPorClasse(classe.id);
+      // 4. Buscar informações dos membros (1 query)
+      const todosMembroIds = [...new Set(membrosClasses?.map(mc => mc.membro_id) || [])];
+      let todosMembros: any[] = [];
+      if (todosMembroIds.length > 0) {
+        const { data } = await supabase
+          .from('membros')
+          .select('id, nome, unidade_id')
+          .in('id', todosMembroIds);
+        todosMembros = data || [];
+      }
 
-          // Adicionar status de ensino aos requisitos para o popup
-          const requisitosComInstrucao = (requisitos || []).map(req => ({
-            ...req,
-            ensinou: statusInstrucao[req.id] || false,
-          }));
+      const membrosPorId: Record<string, any> = {};
+      todosMembros.forEach(m => { membrosPorId[m.id] = m; });
+
+      // 5. Buscar unidades (1 query)
+      const unidadeIds = [...new Set(todosMembros?.map(m => m.unidade_id).filter(Boolean) || [])];
+      let todasUnidades: any[] = [];
+      if (unidadeIds.length > 0) {
+        const { data } = await supabase
+          .from('unidades')
+          .select('id, nome')
+          .in('id', unidadeIds);
+        todasUnidades = data || [];
+      }
+
+      const unidadesPorId: Record<string, any> = {};
+      todasUnidades.forEach(u => { unidadesPorId[u.id] = u; });
+
+      // 6. Buscar TODOS os progressos de requisitos (com batch só por membro_id)
+      let todosProgressos: any[] = [];
+      if (todosMembroIds.length > 0) {
+        todosProgressos = await batchInQuery(
+          (membroIds) =>
+            supabase
+              .from('membros_requisitos')
+              .select('membro_id, requisito_id, completado')
+              .in('membro_id', membroIds) as any,
+          todosMembroIds,
+          30,
+        );
+      }
+
+      // Agrupar progressos por (membro_id + classe_id) para acesso rápido
+      const progressoMap = new Map<string, boolean>();
+      todosProgressos.forEach(p => {
+        progressoMap.set(`${p.membro_id}_${p.requisito_id}`, p.completado);
+      });
+
+      // 7. Buscar TODAS as instruções (1 query)
+      const { data: todasInstrucoes } = await supabase
+        .from('classes_instrucoes')
+        .select('*')
+        .in('classe_id', classIds);
+
+      const instrucoesPorClasse: Record<string, any[]> = {};
+      (todasInstrucoes || []).forEach(inst => {
+        if (!instrucoesPorClasse[inst.classe_id]) instrucoesPorClasse[inst.classe_id] = [];
+        instrucoesPorClasse[inst.classe_id].push(inst);
+      });
+
+      // 8. Buscar conclusões de classes (1 query)
+      const { data: todasConcluidas } = await supabase
+        .from('membros_classes_concluidas')
+        .select('classe_id')
+        .eq('concluido', true)
+        .in('classe_id', classIds);
+
+      const concluidasPorClasse: Record<string, number> = {};
+      (todasConcluidas || []).forEach(c => {
+        concluidasPorClasse[c.classe_id] = (concluidasPorClasse[c.classe_id] || 0) + 1;
+      });
+
+      // 9. Montar resultado (tudo em memória)
+      const classesFormatadas = classesFiltradas.map(classe => {
+        const requisitos = requisitosPorClasse[classe.id] || [];
+        const membrosNaClasse = membrosClasses?.filter(mc => mc.classe_id === classe.id) || [];
+        const instrucoes = instrucoesPorClasse[classe.id] || [];
+
+        const statusInstrucao: Record<string, boolean> = {};
+        instrucoes.forEach(inst => { statusInstrucao[inst.requisito_id] = inst.ensinou; });
+
+        const requisitosComInstrucao = requisitos.map((req: any) => ({
+          ...req,
+          ensinou: statusInstrucao[req.id] || false,
+        }));
+
+        const memberProgress = membrosNaClasse.map(mc => {
+          const membro = membrosPorId[mc.membro_id];
+          const unidade = membro ? unidadesPorId[membro.unidade_id] : null;
+
+          const areasMap: Record<string, any> = {};
+          requisitos.forEach((req: any) => {
+            if (!areasMap[req.area]) {
+              areasMap[req.area] = {
+                id: req.area.toLowerCase(),
+                name: req.area,
+                icon: getAreaIcon(req.area),
+                requirements: [],
+              };
+            }
+            areasMap[req.area].requirements.push({
+              id: req.id,
+              name: req.nome,
+              description: req.descricao || '',
+              completed: progressoMap.get(`${mc.membro_id}_${req.id}`) || false,
+            });
+          });
+
+          const areas = Object.values(areasMap);
+          const completedCount = areas.reduce(
+            (acc: number, a: any) => acc + a.requirements.filter((r: any) => r.completed).length, 0
+          );
 
           return {
-            ...classe,
-            completedBy: stats.membrosConcluiram || 0,
-            progress: membrosNaClasse ? Math.floor((stats.membrosConcluiram / (stats.membrosNaClasse || 1)) * 100) : 0,
-            members: [],
-            memberProgress: membrosComProgresso.map(m => ({
-              memberId: m.membroId,
-              memberName: m.membroNome,
-              memberUnidade: m.membroUnidade,
-              classId: classe.id,
-              className: classe.nome,
-              classColor: classe.cor,
-              areas: m.areas,
-              completedRequirements: m.completedCount,
-              totalRequirements: m.totalCount,
-              progressPercentage: m.progressPercentage,
-            })),
-            requisitos: requisitosComInstrucao,
-            ensinadosCount: instrucao.ensinados,
-            instrucaoPercentage: instrucao.percentage,
+            memberId: mc.membro_id,
+            memberName: membro?.nome || 'Desbravador',
+            memberUnidade: unidade?.nome || 'Sem unidade',
+            classId: classe.id,
+            className: classe.nome,
+            classColor: classe.cor,
+            areas: JSON.parse(JSON.stringify(areas)),
+            completedRequirements: completedCount,
+            totalRequirements: requisitos.length,
+            progressPercentage: requisitos.length > 0 ? Math.floor((completedCount / requisitos.length) * 100) : 0,
           };
-        })
-      );
+        });
+
+        const ensinadosCount = instrucoes.filter((i: any) => i.ensinou).length;
+        const totalMembers = membrosNaClasse.length;
+
+        return {
+          ...classe,
+          completedBy: concluidasPorClasse[classe.id] || 0,
+          progress: totalMembers > 0 ? Math.floor(((concluidasPorClasse[classe.id] || 0) / totalMembers) * 100) : 0,
+          members: [],
+          memberProgress,
+          requisitos: requisitosComInstrucao,
+          ensinadosCount,
+          instrucaoPercentage: requisitos.length > 0 ? Math.round((ensinadosCount / requisitos.length) * 100) : 0,
+        };
+      });
 
       setClasses(classesFormatadas as MemberClass[]);
     } catch (error) {
       console.error('Erro ao carregar classes:', error);
-      // Fallback para DEFAULT_CLASSES se erro
-      setClasses(DEFAULT_CLASSES.map(c => ({
-        ...c,
-        completedBy: 0,
-        progress: 0,
-        members: [],
-        memberProgress: [],
-        requisitos: [],
-      })) as unknown as MemberClass[]);
+      setClasses([]);
     } finally {
       setIsLoading(false);
     }
@@ -233,29 +350,28 @@ export default function ClassesPage() {
     }
   }, [user, profile]);
 
-  const handleClassClick = (classe: MemberClass) => {
+  const buildClassProgress = (classe: MemberClass): ClassProgress => {
     const areas = getClassAreasData(classe.requisitos || []);
-
-    // Se modo instrutor, usar dados de progresso de instrução
-    const progressToUse = isInstrutorMode
-      ? { ensinados: classe.ensinadosCount || 0, percentage: classe.instrucaoPercentage || 0 }
-      : { total: areas.reduce((acc, a) => acc + a.requirements.length, 0), ensinados: 0, percentage: 0 };
-
-    const classProgress: ClassProgress = {
+    const totalReqs = areas.reduce((acc, a) => acc + a.requirements.length, 0);
+    return {
       classId: classe.id,
       className: classe.nome,
       classColor: classe.cor,
       areas,
-      completedRequirements: 0,
-      totalRequirements: areas.reduce((acc, a) => acc + a.requirements.length, 0),
-      progressPercentage: isInstrutorMode ? (classe.instrucaoPercentage || 0) : classe.progress,
+      completedRequirements: isInstrutorMode ? (classe.ensinadosCount || 0) : 0,
+      totalRequirements: totalReqs,
+      progressPercentage: isInstrutorMode ? (classe.instrucaoPercentage || 0) : 0,
     };
+  };
+
+  const handleClassClick = (classe: MemberClass) => {
+    const classProgress = buildClassProgress(classe);
     setSelectedClassProgress(classProgress);
 
-    // Se modo instrutor, salvar o progresso de instrução
     if (isInstrutorMode) {
+      const totalReqs = classProgress.areas.reduce((acc, a) => acc + a.requirements.length, 0);
       setInstrucaoProgress({
-        total: areas.reduce((acc, a) => acc + a.requirements.length, 0),
+        total: totalReqs,
         ensinados: classe.ensinadosCount || 0,
         percentage: classe.instrucaoPercentage || 0,
       });
@@ -281,43 +397,64 @@ export default function ClassesPage() {
 
   const handleSaveProgress = async (membroId: string, requisitoId: string, completado: boolean) => {
     await updateProgressoRequisito(membroId, requisitoId, completado);
+
+    // Atualizar localmente para não precisar recarregar tudo
+    setSelectedMemberProgress(prev => {
+      if (!prev) return null;
+      const updatedAreas = prev.areas.map(area => ({
+        ...area,
+        requirements: area.requirements.map((req: any) =>
+          req.id === requisitoId ? { ...req, completed: completado } : req
+        ),
+      }));
+      const completedCount = updatedAreas.reduce(
+        (acc: number, a: any) => acc + a.requirements.filter((r: any) => r.completed).length, 0
+      );
+      const totalReqs = updatedAreas.reduce((acc, a) => acc + a.requirements.length, 0);
+      return {
+        ...prev,
+        areas: updatedAreas,
+        completedRequirements: completedCount,
+        progressPercentage: totalReqs > 0 ? Math.round((completedCount / totalReqs) * 100) : 0,
+      };
+    });
   };
 
   const handleSalvarInstrucao = async (requisitoId: string, ensinou: boolean) => {
     if (!selectedClassProgress) {
-      console.error('selectedClassProgress é null');
-      addToast({
-        type: 'error',
-        title: 'Erro',
-        message: 'Não foi possível salvar a instrução. Selecione uma classe primeiro.',
-      });
+      addToast({ type: 'error', title: 'Erro', message: 'Selecione uma classe primeiro.' });
       return;
     }
     try {
-      console.log('Salvando instrução - classId:', selectedClassProgress.classId, 'requisitoId:', requisitoId, 'ensinou:', ensinou);
       await salvarInstrucaoRequisito(selectedClassProgress.classId, requisitoId, ensinou);
-      console.log('Salvo com sucesso!');
 
-      // Atualizar o estado local do progresso
-      const novoProgress = {
-        total: instrucaoProgress?.total || 0,
-        ensinados: ensinou
-          ? (instrucaoProgress?.ensinados || 0) + 1
-          : Math.max(0, (instrucaoProgress?.ensinados || 0) - 1),
-        percentage: 0,
-      };
-      novoProgress.percentage = Math.round((novoProgress.ensinados / novoProgress.total) * 100);
-      setInstrucaoProgress(novoProgress);
+      // Atualizar o progresso local e as areas do modal com os dados frescos
+      const total = instrucaoProgress?.total || selectedClassProgress.totalRequirements;
+      const ensinados = ensinou
+        ? (instrucaoProgress?.ensinados || 0) + 1
+        : Math.max(0, (instrucaoProgress?.ensinados || 0) - 1);
+      const percentage = Math.round((ensinados / total) * 100);
 
-      // Recarregar dados para atualizar a lista de classes
-      await carregarDados();
+      setInstrucaoProgress({ total, ensinados, percentage });
+
+      // Atualizar areas do selectedClassProgress com o novo status
+      setSelectedClassProgress(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          areas: prev.areas.map(area => ({
+            ...area,
+            requirements: area.requirements.map((req: any) =>
+              req.id === requisitoId ? { ...req, ensinou } : req
+            ),
+          })),
+          completedRequirements: ensinados,
+          progressPercentage: percentage,
+        };
+      });
     } catch (error) {
       console.error('Erro ao salvar instrução:', error);
-      addToast({
-        type: 'error',
-        title: 'Erro',
-        message: 'Falha ao salvar instrução',
-      });
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar instrução' });
     }
   };
 
@@ -668,7 +805,7 @@ export default function ClassesPage() {
 
       {/* Member/Class Requirements Popup */}
       <ClassRequirementsPopup
-        key={selectedClassProgress?.classId}
+        key={selectedClassProgress?.classId || selectedMemberProgress?.memberId}
         isOpen={isRequirementsModalOpen}
         onClose={handleRequirementsModalClose}
         initialProgress={selectedClassProgress || selectedMemberProgress}

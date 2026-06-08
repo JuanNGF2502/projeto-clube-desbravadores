@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast';
 import { getUnidadeById, getMembrosPorUnidade } from '@/lib/queries';
 import { getCriteriosAvaliacao, criarAvaliacoesBatch, getAvaliacoesPorUnidadeData, CriterioAvaliacaoDB } from '@/lib/queries/avaliacoes';
 import { getSessaoAtiva } from '@/lib/queries/sessoes-avaliacao';
+import { formatDateBR } from '@/utils/date';
 
 interface Membro {
   id: string;
@@ -51,34 +52,6 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
   const [sessaoId, setSessaoId] = useState<string | null>(null);
   const [dataBloqueada, setDataBloqueada] = useState(false);
 
-  // Carregar sessão uma vez no mount
-  useEffect(() => {
-    const carregarSessao = async () => {
-      const sessaoParam = searchParams.get('sessao');
-      if (sessaoParam) {
-        setSessaoId(sessaoParam);
-        const { supabase } = await import('@/lib/supabase/client');
-        const { data: sessao } = await supabase
-          .from('sessoes_avaliacao')
-          .select('data_reuniao')
-          .eq('id', sessaoParam)
-          .single();
-        if (sessao) {
-          setDataAvaliacao(sessao.data_reuniao);
-          setDataBloqueada(true);
-        }
-      } else {
-        const ativa = await getSessaoAtiva(resolvedParams.id);
-        if (ativa) {
-          setSessaoId(ativa.id);
-          setDataAvaliacao(ativa.data_reuniao);
-          setDataBloqueada(true);
-        }
-      }
-    };
-    carregarSessao();
-  }, [resolvedParams.id, searchParams]);
-
   const carregarAvaliacoes = useCallback(async (data: string) => {
     try {
       const [membrosData, criteriosData, avaliacoesData] = await Promise.all([
@@ -110,6 +83,38 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
   const carregarDados = async () => {
     try {
       setIsLoading(true);
+
+      // Carregar sessão e dados em paralelo
+      const sessaoParam = searchParams.get('sessao');
+      let data = new Date().toISOString().split('T')[0];
+      let sessaoIdTemp: string | null = null;
+      let bloqueada = false;
+
+      if (sessaoParam) {
+        sessaoIdTemp = sessaoParam;
+        const { supabase } = await import('@/lib/supabase/client');
+        const { data: sessao } = await supabase
+          .from('sessoes_avaliacao')
+          .select('data_reuniao')
+          .eq('id', sessaoParam)
+          .single();
+        if (sessao) {
+          data = sessao.data_reuniao;
+          bloqueada = true;
+        }
+      } else {
+        const ativa = await getSessaoAtiva(resolvedParams.id);
+        if (ativa) {
+          sessaoIdTemp = ativa.id;
+          data = ativa.data_reuniao;
+          bloqueada = true;
+        }
+      }
+
+      setSessaoId(sessaoIdTemp);
+      setDataAvaliacao(data);
+      setDataBloqueada(bloqueada);
+
       const unidadeData = await getUnidadeById(resolvedParams.id);
       if (!unidadeData) {
         addToast({ type: 'error', title: 'Erro', message: 'Unidade não encontrada' });
@@ -117,7 +122,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
         return;
       }
       setUnidade(unidadeData);
-      await carregarAvaliacoes(dataAvaliacao);
+      await carregarAvaliacoes(data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar dados' });
@@ -130,17 +135,15 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
     carregarDados();
   }, [resolvedParams.id]);
 
-  useEffect(() => {
-    if (!isLoading && unidade) {
-      carregarAvaliacoes(dataAvaliacao);
-    }
-  }, [dataAvaliacao]);
-
   const getPontosPorNivel = (criterio: CriterioAvaliacaoDB, nivel: 'A' | 'B' | 'C'): number => {
     if (nivel === 'A') return criterio.pontos_a;
     if (nivel === 'B') return criterio.pontos_b;
     return criterio.pontos_c;
   };
+
+  // Encontrar o ID do critério "Pontualidade"
+  const pontualidadeCriterio = criterios.find(c => c.nome === 'Pontualidade');
+  const pontualidadeId = pontualidadeCriterio?.id;
 
   const handleNivelChange = (membroId: string, criterioId: string, nivel: 'A' | 'B' | 'C') => {
     const criterio = criterios.find(c => c.id === criterioId);
@@ -154,6 +157,25 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
         novo[membroId] = {};
       }
       novo[membroId][criterioId] = { nivel, pontos };
+
+      // Se pontualidade for C (ausente), zera todos os outros critérios
+      if (criterioId === pontualidadeId && nivel === 'C') {
+        criterios.forEach(c => {
+          if (c.id !== pontualidadeId) {
+            novo[membroId][c.id] = { nivel: 'C' as const, pontos: getPontosPorNivel(c, 'C') };
+          }
+        });
+      }
+
+      // Se pontualidade mudar de C para outro, limpa os C forçados
+      if (criterioId === pontualidadeId && nivel !== 'C') {
+        criterios.forEach(c => {
+          if (c.id !== pontualidadeId && prev[membroId]?.[c.id]?.nivel === 'C') {
+            delete novo[membroId][c.id];
+          }
+        });
+      }
+
       return novo;
     });
   };
@@ -276,7 +298,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
               <Calendar className="w-5 h-5 text-primary" />
               <div>
                 <p className="text-sm font-medium text-text-primary">Data da Avaliação</p>
-                <p className="text-xs text-muted">{new Date(dataAvaliacao).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                <p className="text-xs text-muted">{formatDateBR(dataAvaliacao, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -341,6 +363,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
               const totalMembro = calcularTotalMembro(membro.id);
               const cargoAtivo = membro.membros_cargos?.find((c: any) => c.ativo);
               const classeAtual = membro.membros_classes_atuais?.[0];
+              const membroAusente = pontualidadeId ? avaliacoes[membro.id]?.[pontualidadeId]?.nivel === 'C' : false;
 
               return (
                 <AppCard key={membro.id} className="overflow-hidden">
@@ -371,6 +394,9 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      {membroAusente && (
+                        <AppBadge variant="warning" size="sm">Ausente</AppBadge>
+                      )}
                       <div className="text-right">
                         <p className="text-lg font-bold text-text-primary">{totalMembro}</p>
                         <p className="text-xs text-muted">pontos</p>
@@ -386,10 +412,17 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
                   {/* Avaliações do membro */}
                   {isExpanded && (
                     <div className="border-t border-border p-4 space-y-3">
+                      {/* Alerta de ausente */}
+                      {membroAusente && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
+                          <Clock className="w-4 h-4 text-warning" />
+                          <p className="text-xs text-warning font-medium">Membro ausente — todos os critérios zerados</p>
+                        </div>
+                      )}
                       {criterios.map(criterio => {
                         const avaliacao = avaliacoes[membro.id]?.[criterio.id];
                         const nivel = avaliacao?.nivel || 'C';
-
+                        const isBlocked = membroAusente && criterio.id !== pontualidadeId;
                         return (
                           <div key={criterio.id} className="flex items-center justify-between">
                             <div className="flex-1">
@@ -397,30 +430,36 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
                               <div className="flex gap-2 mt-1">
                                 <button
                                   onClick={() => handleNivelChange(membro.id, criterio.id, 'A')}
-                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                  disabled={isBlocked}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                     nivel === 'A'
-                                      ? 'bg-success text-white'
-                                      : 'bg-surface text-muted hover:bg-success/20'
+                                      ? 'bg-success text-white shadow-sm'
+                                      : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
+                                      : 'bg-surface text-muted hover:bg-success/20 hover:text-success'
                                   }`}
                                 >
                                   A ({criterio.pontos_a})
                                 </button>
                                 <button
                                   onClick={() => handleNivelChange(membro.id, criterio.id, 'B')}
-                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                  disabled={isBlocked}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                     nivel === 'B'
-                                      ? 'bg-primary text-white'
-                                      : 'bg-surface text-muted hover:bg-primary/20'
+                                      ? 'bg-primary text-white shadow-sm'
+                                      : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
+                                      : 'bg-surface text-muted hover:bg-primary/20 hover:text-primary'
                                   }`}
                                 >
                                   B ({criterio.pontos_b})
                                 </button>
                                 <button
                                   onClick={() => handleNivelChange(membro.id, criterio.id, 'C')}
-                                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                  disabled={isBlocked}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                     nivel === 'C'
-                                      ? 'bg-warning text-white'
-                                      : 'bg-surface text-muted hover:bg-warning/20'
+                                      ? 'bg-warning text-white shadow-sm'
+                                      : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
+                                      : 'bg-surface text-muted hover:bg-warning/20 hover:text-warning'
                                   }`}
                                 >
                                   C ({criterio.pontos_c})

@@ -442,6 +442,69 @@ export async function getRankingMembrosDaUnidade(unidadeId: string): Promise<Ran
 }
 
 // ============================================
+// SOMA POR CRITÉRIO DE AVALIAÇÃO
+// ============================================
+
+export interface CriterioSoma {
+  criterioId: string;
+  nome: string;
+  totalPontos: number;
+  maxPontos: number;
+}
+
+export async function getSomaCriteriosUnidade(unidadeId: string): Promise<CriterioSoma[]> {
+  const membros = await supabase
+    .from('membros')
+    .select('id')
+    .eq('unidade_id', unidadeId)
+    .eq('ativo', true);
+
+  if (!membros.data || membros.data.length === 0) return [];
+
+  const membroIds = membros.data.map(m => m.id);
+
+  const { data: criterios } = await supabase
+    .from('criterios_avaliacao')
+    .select('id, nome, pontos_a')
+    .order('ordem');
+
+  if (!criterios) return [];
+
+  // Mapear criterio_id -> nome para agrupar avaliações corretamente
+  const nomePorId: Record<string, { nome: string; max: number }> = {};
+  criterios.forEach(c => {
+    nomePorId[c.id] = { nome: c.nome, max: c.pontos_a || 20 };
+  });
+
+  const { data: avaliacoes } = await supabase
+    .from('avaliacoes')
+    .select('criterio_id, pontos')
+    .in('membro_id', membroIds);
+
+  // Somar por nome do critério (evita duplicatas se houver IDs diferentes p/ mesmo nome)
+  const somaPorNome = new Map<string, number>();
+  (avaliacoes || []).forEach(a => {
+    const info = nomePorId[a.criterio_id];
+    if (!info) return;
+    somaPorNome.set(info.nome, (somaPorNome.get(info.nome) || 0) + (a.pontos || 0));
+  });
+
+  // Usar Map para garantir nome único, preservando ordem
+  const vistos = new Set<string>();
+  return criterios.reduce((acc: CriterioSoma[], c) => {
+    if (vistos.has(c.nome)) return acc;
+    vistos.add(c.nome);
+    acc.push({
+      criterioId: c.id,
+      nome: c.nome,
+      totalPontos: somaPorNome.get(c.nome) || 0,
+      maxPontos: c.pontos_a || 20,
+    });
+    return acc;
+  }, []);
+}
+
+// ============================================
 // ESTATÍSTICAS DA UNIDADE
 // ============================================
 
@@ -455,6 +518,7 @@ export interface EstatisticasUnidade {
     B: number;
     C: number;
   };
+  criterios: CriterioSoma[];
 }
 
 export async function getEstatisticasUnidade(unidadeId: string): Promise<EstatisticasUnidade> {
@@ -467,6 +531,9 @@ export async function getEstatisticasUnidade(unidadeId: string): Promise<Estatis
 
   // Buscar ranking para calcular estatísticas
   const ranking = await getRankingMembrosDaUnidade(unidadeId);
+
+  // Buscar soma por critério
+  const criterios = await getSomaCriteriosUnidade(unidadeId);
 
   const totalPontos = ranking.reduce((sum, m) => sum + m.totalPontos, 0);
   const mediaPontos = ranking.length > 0 ? Math.round(totalPontos / ranking.length) : 0;
@@ -491,5 +558,6 @@ export async function getEstatisticasUnidade(unidadeId: string): Promise<Estatis
     totalPontos,
     ultimaAvaliacao,
     distribuicaoClassificacao,
+    criterios,
   };
 }

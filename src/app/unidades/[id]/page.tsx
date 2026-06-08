@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
-import { Users, Calendar, User, Home, Trophy, ChevronRight, Loader2, ClipboardCheck, Plus, Play, Square, Trash2, Clock } from 'lucide-react';
+import { Users, Calendar, User, Home, Trophy, ChevronRight, Loader2, ClipboardCheck, Plus, Play, Square, Trash2, Clock, ShieldCheck, BookOpen, Heart } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { UnitHeader, TabsNavigation, ScoreCard, RankingModal } from '@/components/unidades';
 import { MembroDetailModal } from '@/components/membros';
@@ -17,10 +17,11 @@ import { useToast } from '@/components/ui/Toast';
 import { Usuario } from '@/types';
 import { getUnidadeById, getMembrosPorUnidade } from '@/lib/queries';
 import { getClasseById } from '@/lib/queries/classes';
-import { getEstatisticasUnidade, getAtividadeRecente } from '@/lib/queries/dashboard';
+import { getEstatisticasUnidade, getAtividadeRecente, CriterioSoma } from '@/lib/queries/dashboard';
 import { DEFAULT_CLASSES } from '@/types';
 import { useClubId, useAuth } from '@/hooks';
 import { getSessoesPorUnidade, getSessaoAtiva, criarSessao, ativarSessao, deleteSessao, SessaoAvaliacao } from '@/lib/queries/sessoes-avaliacao';
+import { formatDateBR } from '@/utils/date';
 
 interface Tab {
   id: string;
@@ -124,16 +125,27 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
     );
   }
 
-  // Scores baseados em estatísticas reais (será null inicialmente, depois carrega)
-  const scoreItems = estatisticasUnidade ? [
-    { id: 'total', icon: Trophy, name: 'Total', score: estatisticasUnidade.totalPontos },
-    { id: 'media', icon: Users, name: 'Média', score: estatisticasUnidade.mediaPontos },
-    { id: 'membros', icon: User, name: 'Membros', score: estatisticasUnidade.totalMembros },
-    { id: 'classA', icon: Calendar, name: 'Class A', score: estatisticasUnidade.distribuicaoClassificacao.A },
-    { id: 'classB', icon: Home, name: 'Class B', score: estatisticasUnidade.distribuicaoClassificacao.B },
-  ] : [];
+  // Scores baseados em critérios reais
+  const criteriaIcons: Record<string, any> = {
+    'Pontualidade': Clock,
+    'Uniforme': ShieldCheck,
+    'Material': BookOpen,
+    'Disciplina': ShieldCheck,
+    'Leitura Bíblica': BookOpen,
+    'Classe': Trophy,
+    'Boa Ação': Heart,
+  };
 
-  const totalScore = scoreItems.reduce((acc, item) => acc + (item.score || 0), 0);
+  interface ScoreItemType { id: string; icon: any; name: string; score: number; maxScore: number; }
+  const scoreItems: ScoreItemType[] = (estatisticasUnidade?.criterios || []).map((c: CriterioSoma) => ({
+    id: c.criterioId,
+    icon: criteriaIcons[c.nome] || Trophy,
+    name: c.nome,
+    score: c.totalPontos,
+    maxScore: c.maxPontos * (estatisticasUnidade.totalMembros || 1),
+  }));
+
+  const totalScore = scoreItems.reduce((acc: number, item: ScoreItemType) => acc + (item.score || 0), 0);
 
   // Converter membros do banco para formato da UI
   const membrosFormatados: Usuario[] = membros.map((m) => {
@@ -232,7 +244,7 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
   };
 
   const handleDeleteSessao = async (sessao: SessaoAvaliacao) => {
-    if (!confirm(`Excluir sessão de ${new Date(sessao.data_reuniao).toLocaleDateString('pt-BR')}?`)) return;
+    if (!confirm(`Excluir sessão de ${formatDateBR(sessao.data_reuniao)}?`)) return;
     try {
       await deleteSessao(sessao.id);
       addToast({ type: 'success', title: 'Sessão excluída', message: '' });
@@ -268,9 +280,9 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
                 color="primary"
               />
               <AppStatsCard
-                label="Presença média"
-                value={`${Math.floor(totalScore / 5)}%`}
-                icon={Calendar}
+                label="Total Pontos"
+                value={totalScore}
+                icon={Trophy}
                 color="success"
               />
             </div>
@@ -290,7 +302,7 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-success">Avaliação disponível!</p>
                   <p className="text-xs text-muted">
-                    Reunião de {new Date(sessaoAtiva.data_reuniao).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    Reunião de {formatDateBR(sessaoAtiva.data_reuniao, { weekday: 'long', day: 'numeric', month: 'long' })}
                   </p>
                 </div>
                 <AppButton
@@ -330,7 +342,7 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
                         <div className="flex items-center gap-3">
                           <div className={`w-2 h-2 rounded-full ${sessao.ativo ? 'bg-success' : 'bg-muted'}`} />
                           <span className="text-sm text-text-primary font-medium">
-                            {new Date(sessao.data_reuniao).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' })}
+                            {formatDateBR(sessao.data_reuniao, { weekday: 'short', day: 'numeric', month: 'short' })}
                           </span>
                           <AppBadge
                             variant={sessao.ativo ? 'success' : 'secondary'}

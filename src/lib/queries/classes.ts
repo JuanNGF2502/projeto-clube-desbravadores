@@ -97,13 +97,12 @@ export async function updateProgressoRequisito(
   requisitoId: string,
   completado: boolean
 ): Promise<void> {
-  // Primeiro verificar se já existe um registro
   const { data: existing } = await supabase
     .from('membros_requisitos')
     .select('*')
     .eq('membro_id', membroId)
     .eq('requisito_id', requisitoId)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     // Update existente

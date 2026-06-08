@@ -21,24 +21,23 @@ export function AppCard({
 }: AppCardProps) {
   const paddings = {
     none: 'p-0',
-    sm: 'p-4',
-    md: 'p-6',
-    lg: 'p-8',
+    sm: 'p-3',
+    md: 'p-4',
+    lg: 'p-5',
   };
 
   const Component = onClick ? motion.div : 'div';
   const motionProps = onClick
     ? {
-        whileHover: { scale: 1.02 },
         whileTap: { scale: 0.98 },
-        transition: { duration: 0.2 },
+        transition: { duration: 0.15 },
       }
     : {};
 
   return (
     <Component
       className={cn(
-        'rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
+        'rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.2)]',
         paddings[padding],
         className
       )}
@@ -69,9 +68,9 @@ export function GlassCard({
 }: GlassCardProps) {
   const paddings = {
     none: 'p-0',
-    sm: 'p-4',
-    md: 'p-6',
-    lg: 'p-8',
+    sm: 'p-3',
+    md: 'p-4',
+    lg: 'p-5',
   };
 
   const blurs = {
@@ -86,7 +85,7 @@ export function GlassCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={cn(
-        'rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.35)]',
+        'rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.2)]',
         blurs[blur],
         paddings[padding],
         className

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, RotateCcw, GraduationCap, UserCheck, BookOpen, Loader2, Trophy } from 'lucide-react';
+import { Check, RotateCcw, GraduationCap, UserCheck, BookOpen, Loader2, Trophy, Save } from 'lucide-react';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppButton } from '@/components/ui/AppButton';
@@ -93,6 +93,7 @@ export function ClassRequirementsPopup({
   const [ensinadosCount, setEnsinadosCount] = useState(0);
   const [instrucaoPercentage, setInstrucaoPercentage] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<Map<string, boolean>>(new Map());
   const { addToast } = useToast();
 
   // Initialize state when progress changes
@@ -119,6 +120,7 @@ export function ClassRequirementsPopup({
       setProgressPercentage(initialProgress.progressPercentage);
       setCompletedCount(initialProgress.completedRequirements);
       setSelectedArea(null);
+      setPendingChanges(new Map());
 
       // Se tem dados de instrução, atualizar contadores
       if (instrucaoProgress && modoInstrutor) {
@@ -149,152 +151,134 @@ export function ClassRequirementsPopup({
     };
   };
 
-  // Toggle requirement (para membro) ou toggle ensino (para instrutor)
+  // Toggle requirement locally (no DB save yet)
   const toggleRequirement = async (areaId: string, reqId: string) => {
-    const isMemberProgressData = initialProgress && 'memberId' in initialProgress;
-    const memberId = isMemberProgressData ? (initialProgress as MemberProgress).memberId : null;
+    const currentReq = areas
+      .find(a => a.id === areaId)
+      ?.requirements.find(r => r.id === reqId);
 
-    // Se for modo instrutor, tratar como ensino
-    if (modoInstrutor && onSalvarInstrucao) {
-      setIsSaving(true);
-      try {
-        const currentReq = areas
-          .find(a => a.id === areaId)
-          ?.requirements.find(r => r.id === reqId);
+    if (!currentReq) return;
 
-        const novoStatus = !(currentReq?.ensinou);
+    if (modoInstrutor) {
+      const novoStatus = !currentReq.ensinou;
 
-        console.log('Popup - chamando onSalvarInstrucao:', reqId, novoStatus);
-        await onSalvarInstrucao(reqId, novoStatus);
-        console.log('Popup - retorno do onSalvarInstrucao');
-
-        // Atualizar estado local
-        const updatedAreas = areas.map((area) => {
-          if (area.id === areaId) {
-            return {
-              ...area,
-              requirements: area.requirements.map((req) => {
-                if (req.id === reqId) {
-                  return {
-                    ...req,
-                    ensinou: novoStatus,
-                    dataEnsino: novoStatus ? new Date().toISOString() : undefined,
-                  };
-                }
-                return req;
-              }),
-            };
-          }
-          return area;
-        });
-
-        setAreas(updatedAreas);
-
-        // Recalcular ensinados
-        const totalEnsinados = updatedAreas.reduce(
-          (acc, area) => acc + area.requirements.filter((r) => r.ensinou).length,
-          0
-        );
-        const totalReqs = updatedAreas.reduce(
-          (acc, area) => acc + area.requirements.length,
-          0
-        );
-        setEnsinadosCount(totalEnsinados);
-        setInstrucaoPercentage(Math.round((totalEnsinados / totalReqs) * 100));
-
-        if (novoStatus) {
-          addToast({
-            type: 'success',
-            title: '✓ Requisito ensinado',
-            message: currentReq?.name || 'Requisito',
-          });
-        } else {
-          addToast({
-            type: 'warning',
-            title: '✗ Ensino removido',
-            message: currentReq?.name || 'Requisito',
-          });
-        }
-      } catch (error) {
-        console.error('Erro ao salvar instrução:', error);
-        addToast({
-          type: 'error',
-          title: 'Erro',
-          message: 'Falha ao salvar instrução',
-        });
-      } finally {
-        setIsSaving(false);
-      }
-      return;
-    }
-
-    // Se for progresso de membro e houver callback, salvar no banco
-    if (memberId && onSaveProgress) {
-      setIsSaving(true);
-      try {
-        // Encontrar o requisito atual para inverter
-        const currentReq = areas
-          .find(a => a.id === areaId)
-          ?.requirements.find(r => r.id === reqId);
-
-        if (currentReq) {
-          await onSaveProgress(memberId, reqId, !currentReq.completed);
-        }
-      } catch (error) {
-        console.error('Erro ao salvar progresso:', error);
-        addToast({
-          type: 'error',
-          title: 'Erro',
-          message: 'Falha ao salvar progresso',
-        });
-        setIsSaving(false);
-        return;
-      }
-      setIsSaving(false);
-    }
-
-    const updatedAreas = areas.map((area) => {
-      if (area.id === areaId) {
-        return {
-          ...area,
-          requirements: area.requirements.map((req) => {
-            if (req.id === reqId) {
-              const newCompleted = !req.completed;
-              return {
-                ...req,
-                completed: newCompleted,
-                completedAt: newCompleted ? new Date() : undefined,
-              };
-            }
-            return req;
-          }),
-        };
-      }
-      return area;
-    });
-
-    setAreas(updatedAreas);
-
-    const { percentage, completed } = calculateProgress(updatedAreas);
-    setProgressPercentage(percentage);
-    setCompletedCount(completed);
-
-    const req = updatedAreas
-      .find((a) => a.id === areaId)
-      ?.requirements.find((r) => r.id === reqId);
-
-    if (req?.completed) {
-      addToast({
-        type: 'success',
-        title: '✓ Requisito concluído',
-        message: req.name,
+      // Track pending change
+      setPendingChanges(prev => {
+        const next = new Map(prev);
+        next.set(reqId, novoStatus);
+        return next;
       });
+
+      // Update local state immediately (optimistic)
+      const updatedAreas = areas.map((area) => {
+        if (area.id === areaId) {
+          return {
+            ...area,
+            requirements: area.requirements.map((req) => {
+              if (req.id === reqId) {
+                return {
+                  ...req,
+                  ensinou: novoStatus,
+                  dataEnsino: novoStatus ? new Date().toISOString() : undefined,
+                };
+              }
+              return req;
+            }),
+          };
+        }
+        return area;
+      });
+
+      setAreas(updatedAreas);
+
+      const totalEnsinados = updatedAreas.reduce(
+        (acc, area) => acc + area.requirements.filter((r) => r.ensinou).length,
+        0
+      );
+      const totalReqs = updatedAreas.reduce(
+        (acc, area) => acc + area.requirements.length,
+        0
+      );
+      setEnsinadosCount(totalEnsinados);
+      setInstrucaoPercentage(Math.round((totalEnsinados / totalReqs) * 100));
     } else {
-      addToast({
-        type: 'warning',
-        title: '✗ Requisito desmarcado',
-        message: req?.name || 'Requisito',
+      const novoStatus = !currentReq.completed;
+
+      // Track pending change
+      setPendingChanges(prev => {
+        const next = new Map(prev);
+        next.set(reqId, novoStatus);
+        return next;
       });
+
+      const updatedAreas = areas.map((area) => {
+        if (area.id === areaId) {
+          return {
+            ...area,
+            requirements: area.requirements.map((req) => {
+              if (req.id === reqId) {
+                return {
+                  ...req,
+                  completed: novoStatus,
+                  completedAt: novoStatus ? new Date() : undefined,
+                };
+              }
+              return req;
+            }),
+          };
+        }
+        return area;
+      });
+
+      setAreas(updatedAreas);
+
+      const { percentage, completed } = calculateProgress(updatedAreas);
+      setProgressPercentage(percentage);
+      setCompletedCount(completed);
+    }
+  };
+
+  // Save all pending changes in batch
+  const handleSaveBatch = async () => {
+    if (pendingChanges.size === 0) return;
+
+    setIsSaving(true);
+    try {
+      const isMemberProgressData = initialProgress && 'memberId' in initialProgress;
+      const memberId = isMemberProgressData ? (initialProgress as MemberProgress).memberId : null;
+
+      if (modoInstrutor && onSalvarInstrucao) {
+        const entries = Array.from(pendingChanges.entries());
+        for (const [reqId, ensinou] of entries) {
+          await onSalvarInstrucao(reqId, ensinou);
+        }
+        addToast({
+          type: 'success',
+          title: 'Instrução salva',
+          message: `${pendingChanges.size} requisito(s) atualizado(s)`,
+        });
+      } else if (memberId && onSaveProgress) {
+        const entries = Array.from(pendingChanges.entries());
+        for (const [reqId, completado] of entries) {
+          await onSaveProgress(memberId, reqId, completado);
+        }
+        addToast({
+          type: 'success',
+          title: 'Progresso salvo',
+          message: `${pendingChanges.size} requisito(s) atualizado(s)`,
+        });
+      }
+
+      setPendingChanges(new Map());
+    } catch (error) {
+      console.error('Erro ao salvar em lote:', error);
+      addToast({
+        type: 'error',
+        title: 'Erro ao salvar',
+        message: 'Algumas alterações podem não ter sido salvas',
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -313,11 +297,33 @@ export function ClassRequirementsPopup({
     setProgressPercentage(0);
     setCompletedCount(0);
 
+    // Track all as pending changes
+    const allPending = new Map<string, boolean>();
+    areas.forEach(area => {
+      area.requirements.forEach(req => {
+        allPending.set(req.id, false);
+      });
+    });
+    setPendingChanges(allPending);
+
     addToast({
       type: 'info',
       title: 'Progresso resetado',
       message: 'Todos os requisitos foram desmarcados',
     });
+  };
+
+  // Close with auto-save
+  const handleClose = async () => {
+    if (pendingChanges.size > 0) {
+      setIsSaving(true);
+      try {
+        await handleSaveBatch();
+      } catch {
+        // Already handled in handleSaveBatch
+      }
+    }
+    onClose();
   };
 
   if (!initialProgress) return null;
@@ -329,7 +335,7 @@ export function ClassRequirementsPopup({
   return (
     <AppModal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={initialProgress.className}
       description={showMemberInfo ? `Progresso de ${(initialProgress as MemberProgress).memberName}` : 'Requisitos da Classe'}
       size="lg"
@@ -461,7 +467,7 @@ export function ClassRequirementsPopup({
               onClick={async () => {
                 if (initialProgress && 'memberId' in initialProgress) {
                   await onConcluirClasse(initialProgress.memberId);
-                  onClose();
+                  handleClose();
                 }
               }}
               variant="primary"
@@ -645,6 +651,24 @@ export function ClassRequirementsPopup({
               👆 Selecione uma área acima para ver seus requisitos
             </p>
           </div>
+        )}
+
+        {/* Save Button */}
+        {pendingChanges.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="sticky bottom-0 pt-2"
+          >
+            <AppButton
+              onClick={handleSaveBatch}
+              isLoading={isSaving}
+              className="w-full"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Salvar {pendingChanges.size} alterações
+            </AppButton>
+          </motion.div>
         )}
       </div>
     </AppModal>
