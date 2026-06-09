@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
-import { Users, User, Home, Trophy, ChevronRight, Loader2, Clock, ShieldCheck, BookOpen, Heart, ClipboardCheck } from 'lucide-react';
+import { Users, User, Home, Trophy, ChevronRight, Loader2, Clock, ShieldCheck, BookOpen, Heart, ClipboardCheck, Sparkles } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { UnitHeader, TabsNavigation, ScoreCard, RankingModal } from '@/components/unidades';
 import { MembroDetailModal } from '@/components/membros';
@@ -19,6 +19,7 @@ import { getClasseById } from '@/lib/queries/classes';
 import { getEstatisticasUnidade, getAtividadeRecente, CriterioSoma } from '@/lib/queries/dashboard';
 import { DEFAULT_CLASSES } from '@/types';
 import { useClubId, useAuth } from '@/hooks';
+import { getSessaoAtiva } from '@/lib/queries/sessoes-avaliacao';
 
 interface Tab {
   id: string;
@@ -50,6 +51,7 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
   const [selectedMembro, setSelectedMembro] = useState<Usuario | null>(null);
   const [estatisticasUnidade, setEstatisticasUnidade] = useState<any>(null);
   const [atividadesRecentes, setAtividadesRecentes] = useState<any[]>([]);
+  const [sessaoAtiva, setSessaoAtiva] = useState<any>(null);
 
   const carregarDados = useCallback(async () => {
     try {
@@ -71,6 +73,9 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
 
       const atividadesData = await getAtividadeRecente(CLUB_ID, 5);
       setAtividadesRecentes(atividadesData);
+
+      const ativa = await getSessaoAtiva(resolvedParams.id);
+      setSessaoAtiva(ativa);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar dados da unidade' });
@@ -212,26 +217,7 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
 
             <ScoreCard items={scoreItems} total={totalScore} />
 
-            <AppCard padding="sm">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Últimas Atividades</h3>
-              <div className="space-y-2">
-                {atividadesRecentes.length === 0 ? (
-                  <p className="text-sm text-muted text-center py-4">Nenhuma atividade recente</p>
-                ) : (
-                  atividadesRecentes.slice(0, 5).map((atv) => (
-                    <div key={atv.id} className="flex items-center justify-between py-2">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm text-text-primary">{atv.descricao}</span>
-                        <p className="text-xs text-muted">{atv.membro_nome}</p>
-                      </div>
-                      <span className="text-xs text-muted ml-2">
-                        {new Date(atv.data).toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </AppCard>
+            
           </motion.div>
         );
 
@@ -398,13 +384,19 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
             <Trophy className="w-5 h-5 mr-2" />
             Ranking
           </AppButton>
-          <AppButton
-            variant="secondary"
-            onClick={() => router.push(`/unidades/${unidade.id}/avaliacoes`)}
-          >
-            <ClipboardCheck className="w-5 h-5 mr-2" />
-            Avaliar
-          </AppButton>
+          <div className="relative">
+            <AppButton
+              variant={sessaoAtiva ? 'primary' : 'secondary'}
+              onClick={() => router.push(`/unidades/${unidade.id}/avaliacoes`)}
+              className="w-full"
+            >
+              <ClipboardCheck className="w-5 h-5 mr-2" />
+              Avaliar
+            </AppButton>
+            {sessaoAtiva && (
+              <span className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-success animate-pulse ring-2 ring-card" />
+            )}
+          </div>
         </div>
 
         <TabsNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
