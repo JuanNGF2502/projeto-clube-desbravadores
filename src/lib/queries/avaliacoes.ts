@@ -22,6 +22,7 @@ export interface AvaliacaoInput {
   pontos: number;
   observacao?: string;
   sessao_id?: string;
+  data?: string;
 }
 
 // ============================================
@@ -73,7 +74,7 @@ export async function criarAvaliacao(avaliacao: AvaliacaoInput) {
       nivel: avaliacao.nivel,
       pontos: avaliacao.pontos,
       observacao: avaliacao.observacao || null,
-      data: new Date().toISOString().split('T')[0],
+      data: avaliacao.data || new Date().toISOString().split('T')[0],
     })
     .select()
     .single();
@@ -89,7 +90,7 @@ export async function criarAvaliacoesBatch(avaliacoes: AvaliacaoInput[]) {
     criterio_id: a.criterio_id,
     nivel: a.nivel,
     pontos: a.pontos,
-    data: new Date().toISOString().split('T')[0],
+    data: a.data || new Date().toISOString().split('T')[0],
     observacao: a.observacao || null,
     sessao_id: a.sessao_id || null,
   }));

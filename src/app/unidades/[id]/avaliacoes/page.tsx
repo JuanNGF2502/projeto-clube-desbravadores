@@ -3,12 +3,11 @@
 import { useState, useEffect, use, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Save, Loader2, Check, X, Calendar, Trophy, Users, ChevronDown, ChevronUp, Lock, Clock } from 'lucide-react';
+import { Save, Loader2, Check, X, Calendar, Trophy, Users, ChevronDown, ChevronUp, Lock, Clock, ClipboardCheck, Star, Sparkles } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppBadge } from '@/components/ui/AppBadge';
-import { AppSelect, type SelectOption } from '@/components/ui/AppSelect';
 import { useToast } from '@/components/ui/Toast';
 import { getUnidadeById, getMembrosPorUnidade } from '@/lib/queries';
 import { getCriteriosAvaliacao, criarAvaliacoesBatch, getAvaliacoesPorUnidadeData, CriterioAvaliacaoDB } from '@/lib/queries/avaliacoes';
@@ -50,7 +49,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
   const [expandedMembros, setExpandedMembros] = useState<Set<string>>(new Set());
   const [avaliacoesAnteriores, setAvaliacoesAnteriores] = useState<any[]>([]);
   const [sessaoId, setSessaoId] = useState<string | null>(null);
-  const [dataBloqueada, setDataBloqueada] = useState(false);
+  const [sessaoAtiva, setSessaoAtiva] = useState<boolean>(false);
 
   const carregarAvaliacoes = useCallback(async (data: string) => {
     try {
@@ -60,7 +59,19 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
         getAvaliacoesPorUnidadeData(resolvedParams.id, data),
       ]);
       setMembros(membrosData || []);
-      setCriterios(criteriosData);
+
+      // Deduplicar critérios por nome
+      const seen = new Set<string>();
+      const unicos: CriterioAvaliacaoDB[] = [];
+      (criteriosData || []).forEach(c => {
+        const key = c.nome.toLowerCase().trim();
+        if (!seen.has(key)) {
+          seen.add(key);
+          unicos.push(c);
+        }
+      });
+      setCriterios(unicos);
+
       setAvaliacoesAnteriores(avaliacoesData);
 
       const avaliacoesMap: Record<string, Record<string, { nivel: 'A' | 'B' | 'C'; pontos: number }>> = {};
@@ -68,10 +79,12 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
         if (!avaliacoesMap[av.membro_id]) {
           avaliacoesMap[av.membro_id] = {};
         }
-        avaliacoesMap[av.membro_id][av.criterio_id] = {
-          nivel: av.nivel,
-          pontos: av.pontos,
-        };
+        if (!avaliacoesMap[av.membro_id][av.criterio_id]) {
+          avaliacoesMap[av.membro_id][av.criterio_id] = {
+            nivel: av.nivel,
+            pontos: av.pontos,
+          };
+        }
       });
       setAvaliacoes(avaliacoesMap);
     } catch (error) {
@@ -84,36 +97,35 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
     try {
       setIsLoading(true);
 
-      // Carregar sessão e dados em paralelo
       const sessaoParam = searchParams.get('sessao');
       let data = new Date().toISOString().split('T')[0];
       let sessaoIdTemp: string | null = null;
-      let bloqueada = false;
+      let ativa = false;
 
       if (sessaoParam) {
         sessaoIdTemp = sessaoParam;
         const { supabase } = await import('@/lib/supabase/client');
         const { data: sessao } = await supabase
           .from('sessoes_avaliacao')
-          .select('data_reuniao')
+          .select('data_reuniao, ativo')
           .eq('id', sessaoParam)
           .single();
         if (sessao) {
           data = sessao.data_reuniao;
-          bloqueada = true;
+          ativa = sessao.ativo;
         }
       } else {
-        const ativa = await getSessaoAtiva(resolvedParams.id);
-        if (ativa) {
-          sessaoIdTemp = ativa.id;
-          data = ativa.data_reuniao;
-          bloqueada = true;
+        const ativaSessao = await getSessaoAtiva(resolvedParams.id);
+        if (ativaSessao) {
+          sessaoIdTemp = ativaSessao.id;
+          data = ativaSessao.data_reuniao;
+          ativa = true;
         }
       }
 
       setSessaoId(sessaoIdTemp);
       setDataAvaliacao(data);
-      setDataBloqueada(bloqueada);
+      setSessaoAtiva(ativa);
 
       const unidadeData = await getUnidadeById(resolvedParams.id);
       if (!unidadeData) {
@@ -141,7 +153,6 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
     return criterio.pontos_c;
   };
 
-  // Encontrar o ID do critério "Pontualidade"
   const pontualidadeCriterio = criterios.find(c => c.nome === 'Pontualidade');
   const pontualidadeId = pontualidadeCriterio?.id;
 
@@ -158,7 +169,6 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
       }
       novo[membroId][criterioId] = { nivel, pontos };
 
-      // Se pontualidade for C (ausente), zera todos os outros critérios
       if (criterioId === pontualidadeId && nivel === 'C') {
         criterios.forEach(c => {
           if (c.id !== pontualidadeId) {
@@ -167,7 +177,6 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
         });
       }
 
-      // Se pontualidade mudar de C para outro, limpa os C forçados
       if (criterioId === pontualidadeId && nivel !== 'C') {
         criterios.forEach(c => {
           if (c.id !== pontualidadeId && prev[membroId]?.[c.id]?.nivel === 'C') {
@@ -193,7 +202,6 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
     try {
       setIsSaving(true);
 
-      // Montar lista de avaliações para salvar
       const avaliacoesParaSalvar: any[] = [];
 
       membros.forEach(membro => {
@@ -206,6 +214,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
             nivel: av.nivel,
             pontos: av.pontos,
             sessao_id: sessaoId || undefined,
+            data: dataAvaliacao,
           });
         });
       });
@@ -223,9 +232,50 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
         message: `${avaliacoesParaSalvar.length} avaliações salvas`,
       });
 
-      // Recarregar avaliações
-      await carregarDados();
+      router.push(`/unidades/${resolvedParams.id}`);
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar avaliações' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
+  const handleSalvarEContinuar = async () => {
+    try {
+      setIsSaving(true);
+
+      const avaliacoesParaSalvar: any[] = [];
+
+      membros.forEach(membro => {
+        const membroAvaliacoes = avaliacoes[membro.id] || {};
+        Object.entries(membroAvaliacoes).forEach(([criterioId, av]) => {
+          avaliacoesParaSalvar.push({
+            membro_id: membro.id,
+            unidade_id: resolvedParams.id,
+            criterio_id: criterioId,
+            nivel: av.nivel,
+            pontos: av.pontos,
+            sessao_id: sessaoId || undefined,
+            data: dataAvaliacao,
+          });
+        });
+      });
+
+      if (avaliacoesParaSalvar.length === 0) {
+        addToast({ type: 'warning', title: 'Atenção', message: 'Nenhuma avaliação preenchida' });
+        return;
+      }
+
+      await criarAvaliacoesBatch(avaliacoesParaSalvar);
+
+      addToast({
+        type: 'success',
+        title: 'Sucesso',
+        message: `${avaliacoesParaSalvar.length} avaliações salvas`,
+      });
+
+      await carregarDados();
     } catch (error) {
       console.error('Erro ao salvar:', error);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar avaliações' });
@@ -279,18 +329,37 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
       title="Avaliações Semanais"
       backHref={`/unidades/${resolvedParams.id}`}
       subtitle={unidade?.nome}
-      actions={
-        <AppButton
-          onClick={handleSalvar}
-          isLoading={isSaving}
-          disabled={totalAvaliacoes === 0}
-        >
-          <Save className="w-4 h-4 mr-2" />
-          Salvar Avaliações
-        </AppButton>
-      }
     >
       <div className="space-y-4">
+        {/* Banner de sessão ativa */}
+        {sessaoAtiva && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-primary/20 via-primary/10 to-background border border-primary/30"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+            <div className="relative flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-primary/20">
+                <ClipboardCheck className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-primary flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Avaliação Ativa
+                </h3>
+                <p className="text-sm text-muted mt-0.5">
+                  {formatDateBR(dataAvaliacao, { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
+              </div>
+              <AppBadge variant="success" size="md" className="animate-pulse">
+                <Check className="w-3 h-3 mr-1" />
+                Ativa
+              </AppBadge>
+            </div>
+          </motion.div>
+        )}
+
         {/* Data da Avaliação */}
         <AppCard>
           <div className="flex items-center justify-between">
@@ -302,7 +371,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {dataBloqueada && (
+              {sessaoAtiva && (
                 <span title="Data definida pela sessão">
                   <Lock className="w-4 h-4 text-muted" />
                 </span>
@@ -311,8 +380,8 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
                 type="date"
                 value={dataAvaliacao}
                 onChange={(e) => setDataAvaliacao(e.target.value)}
-                disabled={dataBloqueada}
-                className={`p-2 rounded-lg border border-border bg-card text-text-primary text-sm ${dataBloqueada ? 'opacity-60 cursor-not-allowed' : ''}`}
+                disabled={sessaoAtiva}
+                className={`p-2 rounded-lg border border-border bg-card text-text-primary text-sm ${sessaoAtiva ? 'opacity-60 cursor-not-allowed' : ''}`}
               />
             </div>
           </div>
@@ -337,158 +406,197 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
           </AppCard>
         </div>
 
-        {/* Critérios */}
+        {/* Critérios de Avaliação */}
         <AppCard>
           <h3 className="font-semibold text-text-primary mb-3">Critérios de Avaliação</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {criterios.map(c => (
-              <div key={c.id} className="text-xs p-2 rounded bg-surface">
-                <p className="font-medium text-text-primary">{c.nome}</p>
-                <p className="text-muted">A: {c.pontos_a} | B: {c.pontos_b} | C: {c.pontos_c}</p>
+              <div key={c.id} className="text-xs p-3 rounded-xl bg-surface border border-border">
+                <p className="font-medium text-text-primary mb-1">{c.nome}</p>
+                <div className="flex items-center gap-2 text-muted">
+                  <span className="text-success font-medium">A:{c.pontos_a}</span>
+                  <span className="text-primary font-medium">B:{c.pontos_b}</span>
+                  <span className="text-warning font-medium">C:{c.pontos_c}</span>
+                </div>
               </div>
             ))}
           </div>
         </AppCard>
 
-        {/* Lista de Membros com Avaliações */}
-        <div className="space-y-3">
-          <h3 className="font-semibold text-text-primary">Avaliações por Membro</h3>
-          {membros.length === 0 ? (
-            <AppCard>
-              <p className="text-center text-muted py-8">Nenhum membro nesta unidade</p>
-            </AppCard>
-          ) : (
-            membros.map(membro => {
-              const isExpanded = expandedMembros.has(membro.id);
-              const totalMembro = calcularTotalMembro(membro.id);
-              const cargoAtivo = membro.membros_cargos?.find((c: any) => c.ativo);
-              const classeAtual = membro.membros_classes_atuais?.[0];
-              const membroAusente = pontualidadeId ? avaliacoes[membro.id]?.[pontualidadeId]?.nivel === 'C' : false;
+        {sessaoAtiva ? (
+          <>
+            {/* Lista de Membros com Avaliações */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-text-primary">Avaliações por Membro</h3>
+              {membros.length === 0 ? (
+                <AppCard>
+                  <p className="text-center text-muted py-8">Nenhum membro nesta unidade</p>
+                </AppCard>
+              ) : (
+                membros.map(membro => {
+                  const isExpanded = expandedMembros.has(membro.id);
+                  const totalMembro = calcularTotalMembro(membro.id);
+                  const cargoAtivo = membro.membros_cargos?.find((c: any) => c.ativo);
+                  const classeAtual = membro.membros_classes_atuais?.[0];
+                  const membroAusente = pontualidadeId ? avaliacoes[membro.id]?.[pontualidadeId]?.nivel === 'C' : false;
 
-              return (
-                <AppCard key={membro.id} className="overflow-hidden">
-                  {/* Header do membro */}
-                  <div
-                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface/50 transition-colors"
-                    onClick={() => toggleMembroExpand(membro.id)}
-                  >
-                    <div className="flex items-center gap-3">
+                  return (
+                    <AppCard key={membro.id} className="overflow-hidden">
                       <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: `${unidade?.cores?.[0] || '#3B82F6'}20` }}
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-surface/50 transition-colors"
+                        onClick={() => toggleMembroExpand(membro.id)}
                       >
-                        {membro.foto ? (
-                          <img src={membro.foto} alt={membro.nome} className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                          <span className="font-medium" style={{ color: unidade?.cores?.[0] || '#3B82F6' }}>
-                            {membro.nome.charAt(0)}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center"
+                            style={{ backgroundColor: `${unidade?.cores?.[0] || '#3B82F6'}20` }}
+                          >
+                            {membro.foto ? (
+                              <img src={membro.foto} alt={membro.nome} className="w-full h-full rounded-full object-cover" />
+                            ) : (
+                              <span className="font-medium" style={{ color: unidade?.cores?.[0] || '#3B82F6' }}>
+                                {membro.nome.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-text-primary">{membro.nome}</p>
+                            <p className="text-xs text-muted">
+                              {getCargoLabel(cargoAtivo?.cargo_tipo)}
+                              {classeAtual?.classe?.nome && ` • ${classeAtual.classe.nome}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {membroAusente && (
+                            <AppBadge variant="warning" size="sm">Ausente</AppBadge>
+                          )}
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-text-primary">{totalMembro}</p>
+                            <p className="text-xs text-muted">pontos</p>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="w-5 h-5 text-muted" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 text-muted" />
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-text-primary">{membro.nome}</p>
-                        <p className="text-xs text-muted">
-                          {getCargoLabel(cargoAtivo?.cargo_tipo)}
-                          {classeAtual?.classe?.nome && ` • ${classeAtual.classe.nome}`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {membroAusente && (
-                        <AppBadge variant="warning" size="sm">Ausente</AppBadge>
-                      )}
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-text-primary">{totalMembro}</p>
-                        <p className="text-xs text-muted">pontos</p>
-                      </div>
-                      {isExpanded ? (
-                        <ChevronUp className="w-5 h-5 text-muted" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-muted" />
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Avaliações do membro */}
-                  {isExpanded && (
-                    <div className="border-t border-border p-4 space-y-3">
-                      {/* Alerta de ausente */}
-                      {membroAusente && (
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
-                          <Clock className="w-4 h-4 text-warning" />
-                          <p className="text-xs text-warning font-medium">Membro ausente — todos os critérios zerados</p>
+                      {isExpanded && (
+                        <div className="border-t border-border p-4 space-y-3">
+                          {membroAusente && (
+                            <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
+                              <Clock className="w-4 h-4 text-warning" />
+                              <p className="text-xs text-warning font-medium">Membro ausente — todos os critérios zerados</p>
+                            </div>
+                          )}
+                          {criterios.map(criterio => {
+                            const avaliacao = avaliacoes[membro.id]?.[criterio.id];
+                            const nivel = avaliacao?.nivel || 'C';
+                            const isBlocked = membroAusente && criterio.id !== pontualidadeId;
+                            return (
+                              <div key={criterio.id} className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-text-primary">{criterio.nome}</p>
+                                  <div className="flex gap-2 mt-1">
+                                    <button
+                                      onClick={() => handleNivelChange(membro.id, criterio.id, 'A')}
+                                      disabled={isBlocked}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                        nivel === 'A'
+                                          ? 'bg-success text-white shadow-sm'
+                                          : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
+                                          : 'bg-surface text-muted hover:bg-success/20 hover:text-success'
+                                      }`}
+                                    >
+                                      A ({criterio.pontos_a})
+                                    </button>
+                                    <button
+                                      onClick={() => handleNivelChange(membro.id, criterio.id, 'B')}
+                                      disabled={isBlocked}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                        nivel === 'B'
+                                          ? 'bg-primary text-white shadow-sm'
+                                          : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
+                                          : 'bg-surface text-muted hover:bg-primary/20 hover:text-primary'
+                                      }`}
+                                    >
+                                      B ({criterio.pontos_b})
+                                    </button>
+                                    <button
+                                      onClick={() => handleNivelChange(membro.id, criterio.id, 'C')}
+                                      disabled={isBlocked}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                        nivel === 'C'
+                                          ? 'bg-warning text-white shadow-sm'
+                                          : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
+                                          : 'bg-surface text-muted hover:bg-warning/20 hover:text-warning'
+                                      }`}
+                                    >
+                                      C ({criterio.pontos_c})
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-right w-16">
+                                  <p className="text-lg font-bold text-text-primary">
+                                    {avaliacao?.pontos || 0}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
-                      {criterios.map(criterio => {
-                        const avaliacao = avaliacoes[membro.id]?.[criterio.id];
-                        const nivel = avaliacao?.nivel || 'C';
-                        const isBlocked = membroAusente && criterio.id !== pontualidadeId;
-                        return (
-                          <div key={criterio.id} className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-text-primary">{criterio.nome}</p>
-                              <div className="flex gap-2 mt-1">
-                                <button
-                                  onClick={() => handleNivelChange(membro.id, criterio.id, 'A')}
-                                  disabled={isBlocked}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                    nivel === 'A'
-                                      ? 'bg-success text-white shadow-sm'
-                                      : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
-                                      : 'bg-surface text-muted hover:bg-success/20 hover:text-success'
-                                  }`}
-                                >
-                                  A ({criterio.pontos_a})
-                                </button>
-                                <button
-                                  onClick={() => handleNivelChange(membro.id, criterio.id, 'B')}
-                                  disabled={isBlocked}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                    nivel === 'B'
-                                      ? 'bg-primary text-white shadow-sm'
-                                      : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
-                                      : 'bg-surface text-muted hover:bg-primary/20 hover:text-primary'
-                                  }`}
-                                >
-                                  B ({criterio.pontos_b})
-                                </button>
-                                <button
-                                  onClick={() => handleNivelChange(membro.id, criterio.id, 'C')}
-                                  disabled={isBlocked}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                    nivel === 'C'
-                                      ? 'bg-warning text-white shadow-sm'
-                                      : isBlocked ? 'bg-muted/20 text-muted cursor-not-allowed'
-                                      : 'bg-surface text-muted hover:bg-warning/20 hover:text-warning'
-                                  }`}
-                                >
-                                  C ({criterio.pontos_c})
-                                </button>
-                              </div>
-                            </div>
-                            <div className="text-right w-16">
-                              <p className="text-lg font-bold text-text-primary">
-                                {avaliacao?.pontos || 0}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </AppCard>
-              );
-            })
-          )}
-        </div>
+                    </AppCard>
+                  );
+                })
+              )}
+            </div>
 
-        {/* Avaliações Anteriores */}
-        {avaliacoesAnteriores && avaliacoesAnteriores.length > 0 && (
-          <AppCard>
-            <h3 className="font-semibold text-text-primary mb-3">Avaliações do Dia</h3>
-            <p className="text-sm text-muted">
-              {avaliacoesAnteriores.length} avaliações registradas para esta data
-            </p>
+            {/* Botões de ação */}
+            <div className="sticky bottom-0 -mx-4 px-4 py-4 bg-background/90 backdrop-blur-md border-t border-border space-y-3" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
+              <AppButton
+                onClick={handleSalvar}
+                isLoading={isSaving}
+                disabled={totalAvaliacoes === 0}
+                className="w-full"
+                size="lg"
+              >
+                <Save className="w-5 h-5 mr-2" />
+                Salvar e Voltar para Unidade
+              </AppButton>
+              <AppButton
+                variant="secondary"
+                onClick={handleSalvarEContinuar}
+                isLoading={isSaving}
+                disabled={totalAvaliacoes === 0}
+                className="w-full"
+              >
+                Salvar e Continuar Avaliando
+              </AppButton>
+            </div>
+          </>
+        ) : (
+          <AppCard className="text-center py-12">
+            <div className="flex flex-col items-center gap-3">
+              <div className="p-4 rounded-full bg-muted/20">
+                <Lock className="w-8 h-8 text-muted" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-text-primary mb-1">Avaliação não ativa</h3>
+                <p className="text-sm text-muted max-w-xs mx-auto">
+                  Para realizar avaliações, o administrador precisa ativar uma sessão de avaliação no perfil.
+                </p>
+              </div>
+              <AppButton
+                variant="secondary"
+                onClick={() => router.push(`/unidades/${resolvedParams.id}`)}
+                className="mt-2"
+              >
+                Voltar para Unidade
+              </AppButton>
+            </div>
           </AppCard>
         )}
       </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
-import { Users, Calendar, User, Home, Trophy, ChevronRight, Loader2, ClipboardCheck, Plus, Play, Square, Trash2, Clock, ShieldCheck, BookOpen, Heart } from 'lucide-react';
+import { Users, User, Home, Trophy, ChevronRight, Loader2, Clock, ShieldCheck, BookOpen, Heart } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { UnitHeader, TabsNavigation, ScoreCard, RankingModal } from '@/components/unidades';
 import { MembroDetailModal } from '@/components/membros';
@@ -12,7 +12,6 @@ import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppStatsCard } from '@/components/ui/AppStatsCard';
 import { AppButton } from '@/components/ui/AppButton';
-import { AppModal } from '@/components/ui/AppModal';
 import { useToast } from '@/components/ui/Toast';
 import { Usuario } from '@/types';
 import { getUnidadeById, getMembrosPorUnidade } from '@/lib/queries';
@@ -20,8 +19,6 @@ import { getClasseById } from '@/lib/queries/classes';
 import { getEstatisticasUnidade, getAtividadeRecente, CriterioSoma } from '@/lib/queries/dashboard';
 import { DEFAULT_CLASSES } from '@/types';
 import { useClubId, useAuth } from '@/hooks';
-import { getSessoesPorUnidade, getSessaoAtiva, criarSessao, ativarSessao, deleteSessao, SessaoAvaliacao } from '@/lib/queries/sessoes-avaliacao';
-import { formatDateBR } from '@/utils/date';
 
 interface Tab {
   id: string;
@@ -53,18 +50,11 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
   const [selectedMembro, setSelectedMembro] = useState<Usuario | null>(null);
   const [estatisticasUnidade, setEstatisticasUnidade] = useState<any>(null);
   const [atividadesRecentes, setAtividadesRecentes] = useState<any[]>([]);
-  // Sessões de avaliação
-  const [sessoes, setSessoes] = useState<SessaoAvaliacao[]>([]);
-  const [sessaoAtiva, setSessaoAtiva] = useState<SessaoAvaliacao | null>(null);
-  const [showSessaoModal, setShowSessaoModal] = useState(false);
-  const [novaDataReuniao, setNovaDataReuniao] = useState(new Date().toISOString().split('T')[0]);
-  const [criandoSessao, setCriandoSessao] = useState(false);
 
   const carregarDados = useCallback(async () => {
     try {
       setIsLoading(true);
 
-      // Buscar unidade
       const unidadeData = await getUnidadeById(resolvedParams.id);
       if (!unidadeData) {
         addToast({ type: 'error', title: 'Erro', message: 'Unidade não encontrada' });
@@ -73,26 +63,14 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
       }
       setUnidade(unidadeData);
 
-      // Buscar membros
       const membrosData = await getMembrosPorUnidade(resolvedParams.id);
       setMembros(membrosData || []);
 
-      // Buscar estatísticas da unidade (inclui avaliações)
       const statsData = await getEstatisticasUnidade(resolvedParams.id);
       setEstatisticasUnidade(statsData);
 
-      // Buscar atividades recentes reais
       const atividadesData = await getAtividadeRecente(CLUB_ID, 5);
       setAtividadesRecentes(atividadesData);
-
-      // Buscar sessões de avaliação
-      const [sessoesData, ativa] = await Promise.all([
-        getSessoesPorUnidade(resolvedParams.id),
-        getSessaoAtiva(resolvedParams.id),
-      ]);
-      setSessoes(sessoesData);
-      setSessaoAtiva(ativa);
-
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar dados da unidade' });
@@ -125,7 +103,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
     );
   }
 
-  // Scores baseados em critérios reais
   const criteriaIcons: Record<string, any> = {
     'Pontualidade': Clock,
     'Uniforme': ShieldCheck,
@@ -147,7 +124,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
 
   const totalScore = scoreItems.reduce((acc: number, item: ScoreItemType) => acc + (item.score || 0), 0);
 
-  // Converter membros do banco para formato da UI
   const membrosFormatados: Usuario[] = membros.map((m) => {
     const classeAtual = m.membros_classes_atuais?.[0];
     const cargoAtivo = m.membros_cargos?.find((c: any) => c.ativo);
@@ -207,59 +183,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
     return classe?.cor || '#64748B';
   };
 
-  const handleCriarSessao = async () => {
-    try {
-      setCriandoSessao(true);
-      await criarSessao(resolvedParams.id, novaDataReuniao);
-      addToast({ type: 'success', title: 'Sessão criada', message: `Sessão para ${new Date(novaDataReuniao).toLocaleDateString('pt-BR')}` });
-      setShowSessaoModal(false);
-      const [sessoesData, ativa] = await Promise.all([
-        getSessoesPorUnidade(resolvedParams.id),
-        getSessaoAtiva(resolvedParams.id),
-      ]);
-      setSessoes(sessoesData);
-      setSessaoAtiva(ativa);
-    } catch (error) {
-      console.error('Erro ao criar sessão:', error);
-      addToast({ type: 'error', title: 'Erro', message: 'Falha ao criar sessão' });
-    } finally {
-      setCriandoSessao(false);
-    }
-  };
-
-  const handleAtivarSessao = async (sessaoId: string, ativo: boolean) => {
-    try {
-      await ativarSessao(sessaoId, ativo);
-      addToast({ type: 'success', title: ativo ? 'Sessão ativada' : 'Sessão desativada', message: '' });
-      const [sessoesData, ativa] = await Promise.all([
-        getSessoesPorUnidade(resolvedParams.id),
-        getSessaoAtiva(resolvedParams.id),
-      ]);
-      setSessoes(sessoesData);
-      setSessaoAtiva(ativa);
-    } catch (error) {
-      console.error('Erro ao alternar sessão:', error);
-      addToast({ type: 'error', title: 'Erro', message: 'Falha ao alternar sessão' });
-    }
-  };
-
-  const handleDeleteSessao = async (sessao: SessaoAvaliacao) => {
-    if (!confirm(`Excluir sessão de ${formatDateBR(sessao.data_reuniao)}?`)) return;
-    try {
-      await deleteSessao(sessao.id);
-      addToast({ type: 'success', title: 'Sessão excluída', message: '' });
-      const [sessoesData, ativa] = await Promise.all([
-        getSessoesPorUnidade(resolvedParams.id),
-        getSessaoAtiva(resolvedParams.id),
-      ]);
-      setSessoes(sessoesData);
-      setSessaoAtiva(ativa);
-    } catch (error) {
-      console.error('Erro ao excluir sessão:', error);
-      addToast({ type: 'error', title: 'Erro', message: 'Falha ao excluir sessão' });
-    }
-  };
-
   const renderContent = () => {
     switch (activeTab) {
       case 'resumo':
@@ -288,89 +211,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
             </div>
 
             <ScoreCard items={scoreItems} total={totalScore} />
-
-            {/* Sessão Ativa - para LIDER */}
-            {!isAdmin && sessaoAtiva && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 rounded-xl bg-success/10 border border-success/30 flex items-center gap-3"
-              >
-                <div className="p-2 rounded-lg bg-success/20">
-                  <ClipboardCheck className="w-5 h-5 text-success" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-success">Avaliação disponível!</p>
-                  <p className="text-xs text-muted">
-                    Reunião de {formatDateBR(sessaoAtiva.data_reuniao, { weekday: 'long', day: 'numeric', month: 'long' })}
-                  </p>
-                </div>
-                <AppButton
-                  variant="primary"
-                  size="sm"
-                  onClick={() => router.push(`/unidades/${unidade.id}/avaliacoes?sessao=${sessaoAtiva.id}`)}
-                >
-                  <ClipboardCheck className="w-4 h-4 mr-1" />
-                  Avaliar
-                </AppButton>
-              </motion.div>
-            )}
-
-            {/* Gerenciamento de Sessões - ADMIN */}
-            {isAdmin && (
-              <AppCard padding="sm">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-primary" />
-                    Sessões de Avaliação
-                  </h3>
-                  <AppButton variant="primary" size="sm" onClick={() => setShowSessaoModal(true)}>
-                    <Plus className="w-4 h-4 mr-1" />
-                    Nova
-                  </AppButton>
-                </div>
-
-                {sessoes.length === 0 ? (
-                  <p className="text-sm text-muted text-center py-3">Nenhuma sessão criada</p>
-                ) : (
-                  <div className="space-y-2">
-                    {sessoes.map(sessao => (
-                      <div
-                        key={sessao.id}
-                        className="flex items-center justify-between p-3 rounded-xl border border-border bg-card"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${sessao.ativo ? 'bg-success' : 'bg-muted'}`} />
-                          <span className="text-sm text-text-primary font-medium">
-                            {formatDateBR(sessao.data_reuniao, { weekday: 'short', day: 'numeric', month: 'short' })}
-                          </span>
-                          <AppBadge
-                            variant={sessao.ativo ? 'success' : 'secondary'}
-                            size="sm"
-                          >
-                            {sessao.ativo ? 'Ativa' : 'Inativa'}
-                          </AppBadge>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {sessao.ativo ? (
-                            <AppButton variant="ghost" size="sm" onClick={() => handleAtivarSessao(sessao.id, false)} title="Desativar">
-                              <Square className="w-4 h-4 text-warning" />
-                            </AppButton>
-                          ) : (
-                            <AppButton variant="ghost" size="sm" onClick={() => handleAtivarSessao(sessao.id, true)} title="Ativar">
-                              <Play className="w-4 h-4 text-success" />
-                            </AppButton>
-                          )}
-                          <AppButton variant="ghost" size="sm" onClick={() => handleDeleteSessao(sessao)} title="Excluir">
-                            <Trash2 className="w-4 h-4 text-danger" />
-                          </AppButton>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </AppCard>
-            )}
 
             <AppCard padding="sm">
               <h3 className="text-sm font-semibold text-text-primary mb-3">Últimas Atividades</h3>
@@ -471,7 +311,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
             transition={{ duration: 0.2 }}
             className="space-y-4"
           >
-            {/* Significado do Logo */}
             {unidade.significado_logo && (
               <AppCard>
                 <div className="flex items-center gap-2 mb-3">
@@ -482,7 +321,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
               </AppCard>
             )}
 
-            {/* História do Nome */}
             {unidade.historia_nome && (
               <AppCard>
                 <div className="flex items-center gap-2 mb-3">
@@ -493,7 +331,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
               </AppCard>
             )}
 
-            {/* Informações da Unidade */}
             <AppCard>
               <h3 className="text-sm font-semibold text-text-primary mb-3">Informações da Unidade</h3>
               <div className="space-y-3">
@@ -553,23 +390,14 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
           gritoDeGuerra={unidade.grito_de_guerra}
         />
 
-        {/* Ranking Button */}
-        <div className="grid grid-cols-2 gap-3">
-          <AppButton
-            variant="primary"
-            onClick={() => setShowRanking(true)}
-          >
-            <Trophy className="w-5 h-5 mr-2" />
-            Ranking
-          </AppButton>
-          <AppButton
-            variant="secondary"
-            onClick={() => router.push(`/unidades/${unidade.id}/avaliacoes${sessaoAtiva ? `?sessao=${sessaoAtiva.id}` : ''}`)}
-          >
-            <ClipboardCheck className="w-5 h-5 mr-2" />
-            Avaliações
-          </AppButton>
-        </div>
+        <AppButton
+          variant="primary"
+          onClick={() => setShowRanking(true)}
+          className="w-full"
+        >
+          <Trophy className="w-5 h-5 mr-2" />
+          Ranking
+        </AppButton>
 
         <TabsNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -594,35 +422,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
         membro={selectedMembro}
         unidadeCores={unidade.cores || ['#3B82F6']}
       />
-
-      {/* Nova Sessão Modal */}
-      <AppModal
-        isOpen={showSessaoModal}
-        onClose={() => setShowSessaoModal(false)}
-        title="Nova Sessão de Avaliação"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-1 block">Data da Reunião</label>
-            <input
-              type="date"
-              value={novaDataReuniao}
-              onChange={(e) => setNovaDataReuniao(e.target.value)}
-              className="w-full p-3 rounded-xl border border-border bg-card text-text-primary"
-            />
-          </div>
-          <div className="flex gap-3">
-            <AppButton variant="secondary" onClick={() => setShowSessaoModal(false)} className="flex-1">
-              Cancelar
-            </AppButton>
-            <AppButton onClick={handleCriarSessao} isLoading={criandoSessao} className="flex-1">
-              <Plus className="w-4 h-4 mr-1" />
-              Criar
-            </AppButton>
-          </div>
-        </div>
-      </AppModal>
     </AppLayout>
   );
 }
