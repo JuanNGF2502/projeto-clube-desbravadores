@@ -360,33 +360,6 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
           </motion.div>
         )}
 
-        {/* Data da Avaliação */}
-        <AppCard>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium text-text-primary">Data da Avaliação</p>
-                <p className="text-xs text-muted">{formatDateBR(dataAvaliacao, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {sessaoAtiva && (
-                <span title="Data definida pela sessão">
-                  <Lock className="w-4 h-4 text-muted" />
-                </span>
-              )}
-              <input
-                type="date"
-                value={dataAvaliacao}
-                onChange={(e) => setDataAvaliacao(e.target.value)}
-                disabled={sessaoAtiva}
-                className={`p-2 rounded-lg border border-border bg-card text-text-primary text-sm ${sessaoAtiva ? 'opacity-60 cursor-not-allowed' : ''}`}
-              />
-            </div>
-          </div>
-        </AppCard>
-
         {/* Estatísticas do Dia */}
         <div className="grid grid-cols-3 gap-3">
           <AppCard className="text-center">
