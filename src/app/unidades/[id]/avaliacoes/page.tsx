@@ -571,13 +571,13 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
           </>
         ) : (
           <AppCard className="text-center py-8">
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted mb-4">
               Ative uma sessão no perfil do administrador para começar a avaliar.
             </p>
             <AppButton
               variant="secondary"
               onClick={() => router.push(`/unidades/${resolvedParams.id}`)}
-              className="mt-4"
+              className="mx-auto"
             >
               Voltar para Unidade
             </AppButton>
