@@ -331,8 +331,8 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
       subtitle={unidade?.nome}
     >
       <div className="space-y-4">
-        {/* Banner de sessão ativa */}
-        {sessaoAtiva && (
+        {/* Banner de sessão ativa/inativa */}
+        {sessaoAtiva ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -356,6 +356,25 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
                 <Check className="w-3 h-3 mr-1" />
                 Ativa
               </AppBadge>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-muted/10 via-background to-background border border-border"
+          >
+            <div className="relative flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-muted/20">
+                <Lock className="w-6 h-6 text-muted" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-text-primary">Avaliação Inativa</h3>
+                <p className="text-sm text-muted mt-0.5">
+                  Nenhuma sessão de avaliação ativa para esta unidade.
+                </p>
+              </div>
+              <AppBadge variant="secondary" size="md">Inativa</AppBadge>
             </div>
           </motion.div>
         )}
@@ -551,25 +570,17 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
             </div>
           </>
         ) : (
-          <AppCard className="text-center py-12">
-            <div className="flex flex-col items-center gap-3">
-              <div className="p-4 rounded-full bg-muted/20">
-                <Lock className="w-8 h-8 text-muted" />
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-text-primary mb-1">Avaliação não ativa</h3>
-                <p className="text-sm text-muted max-w-xs mx-auto">
-                  Para realizar avaliações, o administrador precisa ativar uma sessão de avaliação no perfil.
-                </p>
-              </div>
-              <AppButton
-                variant="secondary"
-                onClick={() => router.push(`/unidades/${resolvedParams.id}`)}
-                className="mt-2"
-              >
-                Voltar para Unidade
-              </AppButton>
-            </div>
+          <AppCard className="text-center py-8">
+            <p className="text-sm text-muted">
+              Ative uma sessão no perfil do administrador para começar a avaliar.
+            </p>
+            <AppButton
+              variant="secondary"
+              onClick={() => router.push(`/unidades/${resolvedParams.id}`)}
+              className="mt-4"
+            >
+              Voltar para Unidade
+            </AppButton>
           </AppCard>
         )}
       </div>
