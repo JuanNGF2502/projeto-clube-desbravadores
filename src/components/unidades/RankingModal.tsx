@@ -1,25 +1,16 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Trophy, Medal, Star, Users, Calendar, Check, AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { Trophy, Medal, Star, Users, Calendar, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppModal } from '@/components/ui/AppModal';
-import { AppButton } from '@/components/ui/AppButton';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/utils/cn';
 import {
-  CRITERIOS_AVALIACAO,
-  CLASSIFICACOES,
-  PontuacaoNivel,
-  calcularClassificacao,
-  calcularTotalPontos,
-} from '@/types';
-import {
   getRankingMembrosDaUnidade,
   getEstatisticasUnidade,
-  salvarAvaliacoesBatch,
   getUltimaAvaliacaoDaUnidade,
 } from '@/lib/queries/dashboard';
 
@@ -32,7 +23,7 @@ interface RankingModalProps {
   membros: { id: string; nome: string; funcao?: string }[];
 }
 
-type TabMode = 'ranking' | 'avaliar';
+type TabMode = 'ranking';
 
 interface RankingMembroData {
   id: string;
@@ -62,12 +53,7 @@ export function RankingModal({
   unidadeCores,
   membros,
 }: RankingModalProps) {
-  const [activeTab, setActiveTab] = useState<TabMode>('ranking');
-  const [selectedMembro, setSelectedMembro] = useState<string | null>(null);
-  const [avaliacoes, setAvaliacoes] = useState<Record<string, Record<string, PontuacaoNivel>>>({});
-  const [showResults, setShowResults] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [rankingData, setRankingData] = useState<RankingMembroData[]>([]);
   const [estatisticas, setEstatisticas] = useState<EstatisticasUnidade | null>(null);
   const [ultimaAvaliacao, setUltimaAvaliacao] = useState<string | null>(null);
@@ -102,9 +88,7 @@ export function RankingModal({
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setAvaliacoes({});
-      setShowResults(false);
-      setSelectedMembro(null);
+      setIsLoading(false);
     }
   }, [isOpen]);
 
@@ -162,115 +146,13 @@ export function RankingModal({
   const totalUnidade = estatisticas?.totalPontos || dadosExibir.reduce((acc, m) => acc + m.totalPontos, 0);
   const mediaUnidade = estatisticas?.mediaPontos || Math.round(totalUnidade / (dadosExibir.length || 1));
 
-  const handleAvaliar = (membroId: string, criterioId: string, nivel: PontuacaoNivel) => {
-    setAvaliacoes((prev) => {
-      const newAvaliacao = { ...(prev[membroId] || {}) };
-      newAvaliacao[criterioId] = nivel;
-
-      // Se pontualidade for 0 (ausente), zera todos os outros critérios
-      if (criterioId === 'pontualidade' && nivel === 'C') {
-        CRITERIOS_AVALIACAO.forEach((c) => {
-          if (c.id !== 'pontualidade') {
-            newAvaliacao[c.id] = 'C';
-          }
-        });
-      }
-
-      // Se pontualidade não for maisausente, limpa os zeros forcados
-      if (criterioId === 'pontualidade' && nivel !== 'C') {
-        CRITERIOS_AVALIACAO.forEach((c) => {
-          if (c.id !== 'pontualidade' && prev[membroId]?.[c.id] === 'C') {
-            delete newAvaliacao[c.id];
-          }
-        });
-      }
-
-      return {
-        ...prev,
-        [membroId]: newAvaliacao,
-      };
-    });
-  };
-
-  const isMembroAusente = (membroId: string) => {
-    return avaliacoes[membroId]?.pontualidade === 'C';
-  };
-
-  const getPontosMembro = (membroId: string) => {
-    const avaliacao = avaliacoes[membroId];
-    if (!avaliacao) return 0;
-
-    let total = 0;
-    CRITERIOS_AVALIACAO.forEach((criterio) => {
-      const nivel = avaliacao[criterio.id];
-      if (nivel) {
-        const opcao = criterio.opcoes.find((o) => o.opcao === nivel);
-        if (opcao) total += opcao.pontos;
-      }
-    });
-    return total;
-  };
-
-  const todosAvaliados = membros.every((m) => {
-    // Se membro está ausente, só precisa avaliar pontualidade
-    if (isMembroAusente(m.id)) {
-      return !!avaliacoes[m.id]?.pontualidade;
-    }
-    return CRITERIOS_AVALIACAO.every((c) => avaliacoes[m.id]?.[c.id]);
-  });
-
-  const handleSalvarAvaliacoes = async () => {
-    try {
-      setIsSaving(true);
-
-      // Montar avaliações para salvar
-      const dataAvaliacao = new Date().toISOString().split('T')[0];
-      const avaliacoesParaSalvar: Omit<{ membro_id: string; unidade_id: string; data: string; criterio_id: string; nivel: 'A' | 'B' | 'C'; pontos: number }, 'id'>[] = [];
-
-      Object.entries(avaliacoes).forEach(([membroId, criterios]) => {
-        Object.entries(criterios).forEach(([criterioId, nivel]) => {
-          const criterio = CRITERIOS_AVALIACAO.find(c => c.id === criterioId);
-          if (criterio) {
-            const opcao = criterio.opcoes.find(o => o.opcao === nivel);
-            if (opcao) {
-              avaliacoesParaSalvar.push({
-                membro_id: membroId,
-                unidade_id: unidadeId,
-                data: dataAvaliacao,
-                criterio_id: criterioId,
-                nivel,
-                pontos: opcao.pontos,
-              });
-            }
-          }
-        });
-      });
-
-      if (avaliacoesParaSalvar.length > 0) {
-        await salvarAvaliacoesBatch(avaliacoesParaSalvar);
-      }
-
-      // Recarregar ranking após salvar
-      const [ranking, stats] = await Promise.all([
-        getRankingMembrosDaUnidade(unidadeId),
-        getEstatisticasUnidade(unidadeId),
-      ]);
-      setRankingData(ranking);
-      setEstatisticas(stats);
-      setUltimaAvaliacao(dataAvaliacao);
-
-      setShowResults(true);
-      addToast({ type: 'success', title: 'Sucesso', message: 'Avaliações salvas com sucesso!' });
-    } catch (error) {
-      console.error('Erro ao salvar avaliações:', error);
-      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar avaliações' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const getClassificacaoInfo = (nivel: PontuacaoNivel) => {
-    return CLASSIFICACOES.find((c) => c.nivel === nivel) || CLASSIFICACOES[2];
+  const getClassificacaoInfo = (nivel: string) => {
+    const classificacoes: Record<string, { label: string; cor: string }> = {
+      A: { label: 'A', cor: '#22C55E' },
+      B: { label: 'B', cor: '#3B82F6' },
+      C: { label: 'C', cor: '#F59E0B' },
+    };
+    return classificacoes[nivel] || classificacoes['C'];
   };
 
   const getMedalha = (posicao: number) => {
@@ -326,28 +208,6 @@ export function RankingModal({
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-4">
-        <AppButton
-          variant={activeTab === 'ranking' ? 'primary' : 'secondary'}
-          size="sm"
-          onClick={() => setActiveTab('ranking')}
-          className="flex-1"
-        >
-          <Trophy className="w-4 h-4 mr-2" />
-          Ranking
-        </AppButton>
-        <AppButton
-          variant={activeTab === 'avaliar' ? 'primary' : 'secondary'}
-          size="sm"
-          onClick={() => setActiveTab('avaliar')}
-          className="flex-1"
-        >
-          <Check className="w-4 h-4 mr-2" />
-          Avaliar
-        </AppButton>
-      </div>
-
       <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -360,320 +220,113 @@ export function RankingModal({
             <p className="text-xs text-muted mt-1">Realize avaliações para ver o ranking</p>
           </div>
         ) : (
-          <AnimatePresence mode="wait">
-            {activeTab === 'ranking' ? (
-              <motion.div
-                key="ranking"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                className="space-y-3"
-              >
-                {dadosExibir.map((membro, index) => {
-                  const classInfo = getClassificacaoInfo(membro.classificacao);
-                  const isPodium = index < 3;
-                  return (
-                    <motion.div
-                      key={membro.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <AppCard
-                        hover
-                        padding="sm"
-                        className={cn(
-                          'flex items-center gap-3 transition-all',
-                          isPodium && 'border-l-4',
-                          index === 0 && 'border-l-yellow-400 ring-1 ring-yellow-400/30',
-                          index === 1 && 'border-l-gray-400',
-                          index === 2 && 'border-l-amber-600',
-                        )}
-                      >
-                        {/* Avatar com posição sobreposta */}
-                        <div className="relative flex-shrink-0">
-                          <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center"
-                            style={{
-                              background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2] || unidadeCores[0]})`,
-                            }}
-                          >
-                            {membro.foto ? (
-                              <img src={membro.foto} alt={membro.nome} className="w-full h-full rounded-full object-cover" />
-                            ) : (
-                              <span className="text-white font-bold text-lg">
-                                {membro.nome.charAt(0)}
-                              </span>
-                            )}
-                          </div>
-                          {isPodium ? (
-                            <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center shadow-lg shadow-yellow-400/30">
-                              {index === 0 ? (
-                                <Trophy className="w-3.5 h-3.5 text-white" />
-                              ) : (
-                                <Medal className="w-3.5 h-3.5 text-white" />
-                              )}
-                            </div>
-                          ) : (
-                            <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-muted/30 flex items-center justify-center border-2 border-card">
-                              <span className="text-[10px] font-bold text-muted">{index + 1}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="font-semibold text-sm text-text-primary leading-tight">
-                              {membro.nome}
-                            </h4>
-                            <AppBadge
-                              size="sm"
-                              color={classInfo.cor}
-                              className="text-white"
-                            >
-                              {classInfo.label}
-                            </AppBadge>
-                          </div>
-                          <p className="text-xs text-muted mt-0.5">
-                            {(membro as any).cargo || (membro as any).funcao || 'Desbravador'}
-                          </p>
-                        </div>
-
-                        {/* Pontos */}
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xl font-bold text-text-primary leading-none">{membro.totalPontos}</p>
-                          <p className="text-[10px] text-muted mt-0.5">pts</p>
-                        </div>
-                      </AppCard>
-                    </motion.div>
-                  );
-                })}
-              </motion.div>
-          ) : showResults ? (
-            <motion.div
-              key="results"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="space-y-4"
-            >
-              <div className="text-center p-6 bg-success/10 rounded-xl">
-                <Check className="w-12 h-12 text-success mx-auto mb-2" />
-                <h3 className="text-lg font-bold text-text-primary">Avaliação Salva!</h3>
-                <p className="text-sm text-muted">As avaliações foram registradas com sucesso.</p>
-              </div>
-
-              {membros.map((membro) => {
-                const pontos = getPontosMembro(membro.id);
-                const classInfo = getClassificacaoInfo(calcularClassificacao(pontos));
-                return (
-                  <AppCard key={membro.id}>
-                    <div className="flex items-center gap-3">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-3"
+          >
+            {dadosExibir.map((membro, index) => {
+              const classInfo = getClassificacaoInfo(membro.classificacao);
+              const isPodium = index < 3;
+              return (
+                <motion.div
+                  key={membro.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <AppCard
+                    hover
+                    padding="sm"
+                    className={cn(
+                      'flex items-center gap-3 transition-all',
+                      isPodium && 'border-l-4',
+                      index === 0 && 'border-l-yellow-400 ring-1 ring-yellow-400/30',
+                      index === 1 && 'border-l-gray-400',
+                      index === 2 && 'border-l-amber-600',
+                    )}
+                  >
+                    {/* Avatar com posição sobreposta */}
+                    <div className="relative flex-shrink-0">
                       <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
+                        className="w-12 h-12 rounded-full flex items-center justify-center"
                         style={{
-                          background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2]})`,
+                          background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2] || unidadeCores[0]})`,
                         }}
                       >
-                        <span className="text-white font-bold">{membro.nome.charAt(0)}</span>
+                        {membro.foto ? (
+                          <img src={membro.foto} alt={membro.nome} className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <span className="text-white font-bold text-lg">
+                            {membro.nome.charAt(0)}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-text-primary">{membro.nome}</h4>
+                      {isPodium ? (
+                        <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center shadow-lg shadow-yellow-400/30">
+                          {index === 0 ? (
+                            <Trophy className="w-3.5 h-3.5 text-white" />
+                          ) : (
+                            <Medal className="w-3.5 h-3.5 text-white" />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-muted/30 flex items-center justify-center border-2 border-card">
+                          <span className="text-[10px] font-bold text-muted">{index + 1}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-semibold text-sm text-text-primary leading-tight">
+                          {membro.nome}
+                        </h4>
                         <AppBadge
                           size="sm"
                           color={classInfo.cor}
-                          className="text-white mt-1"
+                          className="text-white"
                         >
-                          {classInfo.label} ({pontos} pts)
+                          {classInfo.label}
                         </AppBadge>
                       </div>
-                    </div>
-                  </AppCard>
-                );
-              })}
-
-              <AppButton variant="primary" className="w-full" onClick={onClose}>
-                Fechar
-              </AppButton>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="avaliar"
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              className="space-y-4"
-            >
-              {/* Seletor de membro */}
-              {!selectedMembro ? (
-                <>
-                  <p className="text-sm text-muted text-center mb-3">
-                    Selecione um desbravador para avaliar
-                  </p>
-                  {membros.map((membro) => (
-                    <AppCard
-                      key={membro.id}
-                      hover
-                      className="flex items-center gap-3 cursor-pointer"
-                      onClick={() => setSelectedMembro(membro.id)}
-                    >
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{
-                          background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2]})`,
-                        }}
-                      >
-                        <span className="text-white font-bold">{membro.nome.charAt(0)}</span>
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-text-primary">{membro.nome}</h4>
-                        <p className="text-xs text-muted">{(membro as any).cargo || (membro as any).funcao || 'Desbravador'}</p>
-                      </div>
-                      <AppButton variant="secondary" size="sm">
-                        Avaliar
-                      </AppButton>
-                    </AppCard>
-                  ))}
-                </>
-              ) : (
-                <>
-                  <AppButton
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedMembro(null)}
-                    className="mb-2"
-                  >
-                    ← Voltar
-                  </AppButton>
-
-                  <div className="flex items-center gap-3 mb-4 p-3 bg-muted/20 rounded-xl">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center"
-                      style={{
-                        background: `linear-gradient(135deg, ${unidadeCores[0]}, ${unidadeCores[2]})`,
-                      }}
-                    >
-                      <span className="text-white font-bold">
-                        {membros.find((m) => m.id === selectedMembro)?.nome.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-text-primary">
-                        {membros.find((m) => m.id === selectedMembro)?.nome}
-                      </h4>
-                      <p className="text-xs text-muted">
-                        Pontuação atual: {getPontosMembro(selectedMembro)} pts
+                      <p className="text-xs text-muted mt-0.5">
+                        {(membro as any).cargo || (membro as any).funcao || 'Desbravador'}
                       </p>
                     </div>
-                  </div>
 
-                  {CRITERIOS_AVALIACAO.map((criterio) => {
-                    const isBlocked = criterio.id !== 'pontualidade' && isMembroAusente(selectedMembro);
-                    return (
-                      <AppCard key={criterio.id} padding="sm" className={isBlocked ? 'opacity-50' : ''}>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-text-primary">{criterio.nome}</h4>
-                          {isBlocked && (
-                            <AppBadge variant="danger" size="sm">
-                              Ausente
-                            </AppBadge>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          {criterio.opcoes.map((opcao) => (
-                            <button
-                              key={opcao.opcao}
-                              onClick={() => !isBlocked && handleAvaliar(selectedMembro, criterio.id, opcao.opcao)}
-                              disabled={isBlocked}
-                              className={cn(
-                                'flex-1 p-2 rounded-lg border-2 text-center transition-all text-xs',
-                                avaliacoes[selectedMembro]?.[criterio.id] === opcao.opcao
-                                  ? 'border-primary bg-primary/10 text-primary'
-                                  : 'border-border hover:border-primary/50',
-                                isBlocked && 'cursor-not-allowed opacity-50'
-                              )}
-                            >
-                              <span className="font-bold">{opcao.pontos}pts</span>
-                              <p className="mt-1 text-muted line-clamp-2">{opcao.descricao}</p>
-                            </button>
-                          ))}
-                        </div>
-                      </AppCard>
-                    );
-                  })}
-
-                  {/* Preview da pontuação */}
-                  <AppCard className="bg-primary/10 border-primary/30">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted">Pontuação Estimada</p>
-                        <p className="text-2xl font-bold text-primary">
-                          {getPontosMembro(selectedMembro)} pts
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        {getPontosMembro(selectedMembro) > 0 && (
-                          <>
-                            <p className="text-sm text-muted">Classificação</p>
-                            <AppBadge
-                              size="sm"
-                              color={
-                                getClassificacaoInfo(calcularClassificacao(getPontosMembro(selectedMembro))).cor
-                              }
-                              className="text-white"
-                            >
-                              {getClassificacaoInfo(calcularClassificacao(getPontosMembro(selectedMembro))).label}
-                            </AppBadge>
-                          </>
-                        )}
-                      </div>
+                    {/* Pontos */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl font-bold text-text-primary leading-none">{membro.totalPontos}</p>
+                      <p className="text-[10px] text-muted mt-0.5">pts</p>
                     </div>
                   </AppCard>
-
-                  <AppButton
-                    variant="primary"
-                    className="w-full"
-                    disabled={!avaliacoes[selectedMembro]}
-                    onClick={() => setSelectedMembro(null)}
-                  >
-                    <Check className="w-4 h-4 mr-2" />
-                    Salvar e Voltar
-                  </AppButton>
-                </>
-              )}
-
-              {selectedMembro === null && membros.length > 0 && !showResults && (
-                <AppButton
-                  variant="primary"
-                  className="w-full mt-4"
-                  disabled={!todosAvaliados}
-                  onClick={handleSalvarAvaliacoes}
-                >
-                  <Clock className="w-4 h-4 mr-2" />
-                  Finalizar Avaliação da Semana
-                </AppButton>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      )}
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
       </div>
 
       {/* Legenda */}
       <div className="mt-3 pt-3 border-t border-border">
         <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-2">Classificação</p>
         <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {CLASSIFICACOES.map((c) => (
-            <div key={c.nivel} className="flex items-center gap-1.5">
-              <div
-                className="w-2.5 h-2.5 rounded-full ring-1 ring-black/10"
-                style={{ backgroundColor: c.cor }}
-              />
-              <span className="text-xs text-muted">
-                {c.label}
-              </span>
-            </div>
-          ))}
+          {['A', 'B', 'C'].map((nivel) => {
+            const info = getClassificacaoInfo(nivel);
+            return (
+              <div key={nivel} className="flex items-center gap-1.5">
+                <div
+                  className="w-2.5 h-2.5 rounded-full ring-1 ring-black/10"
+                  style={{ backgroundColor: info.cor }}
+                />
+                <span className="text-xs text-muted">
+                  {info.label}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </AppModal>
