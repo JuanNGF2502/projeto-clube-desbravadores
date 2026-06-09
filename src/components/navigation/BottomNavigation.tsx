@@ -29,9 +29,9 @@ export function BottomNavigation({
     <nav className={cn(
       'fixed bottom-0 left-0 right-0 z-50',
       'glass-effect border-t border-white/10',
-      'px-4 py-3 pb-safe',
+      'px-4 pt-3',
       'flex justify-between items-center'
-    )}>
+    )} style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
       {items.map((item) => (
         <Link
           key={item.href}

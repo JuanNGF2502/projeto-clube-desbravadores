@@ -82,10 +82,13 @@
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
   background-color: var(--bg);
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -94,6 +97,52 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  /* iOS scroll fixes */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+}
+
+/* Prevent rubber-band scrolling on all scrollable containers */
+div,
+main,
+section,
+article,
+aside {
+  overscroll-behavior: contain;
+}
+
+/* Clickable elements should have pointer cursor on iOS too */
+a,
+button,
+[role="button"],
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* Disable text selection on interactive elements on iOS */
+a,
+button,
+label {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS input fixes */
+input,
+textarea,
+select {
+  font-size: 16px !important; /* Prevents iOS zoom on focus */
+  touch-action: manipulation;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0.75rem;
+}
+
+/* Fix modal scroll when keyboard is open on iOS */
+.modal-content {
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Glass Effect */

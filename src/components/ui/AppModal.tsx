@@ -42,10 +42,20 @@ export function AppModal({
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${window.scrollY}px`;
     }
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     };
   }, [isOpen, handleEscape]);
 
@@ -111,10 +121,10 @@ export function AppModal({
               </div>
             )}
             <div className={cn(
-              'flex-1 overflow-y-auto px-5 pb-5',
+              'flex-1 overflow-y-auto px-5',
               (title || showCloseButton) ? 'pt-4' : 'pt-5',
               scrollable && 'max-h-[calc(90vh-80px)]'
-            )}>
+            )} style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}>
               {children}
             </div>
           </motion.div>

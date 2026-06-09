@@ -52,7 +52,7 @@ export function AppLayout({
   return (
     <div className="min-h-screen w-full max-w-md mx-auto relative flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
       <header
-        className="sticky top-0 z-40 backdrop-blur-md"
+        className="sticky top-0 z-40 backdrop-blur-md safe-area-top"
         style={{
           backgroundColor: 'color-mix(in srgb, var(--bg) 90%, transparent)',
           borderBottom: '1px solid var(--border-color)',

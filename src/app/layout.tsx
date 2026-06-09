@@ -47,6 +47,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#FAFAFA' },
     { media: '(prefers-color-scheme: dark)', color: '#09090B' },
@@ -89,6 +90,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Desbravadores" />
+        <meta name="format-detection" content="telephone=no" />
 
         {/* Android */}
         <meta name="mobile-web-app-capable" content="yes" />
