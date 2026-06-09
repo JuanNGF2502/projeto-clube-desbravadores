@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
-import { Users, User, Home, Trophy, ChevronRight, Loader2, Clock, ShieldCheck, BookOpen, Heart } from 'lucide-react';
+import { Users, User, Home, Trophy, ChevronRight, Loader2, Clock, ShieldCheck, BookOpen, Heart, ClipboardCheck } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { UnitHeader, TabsNavigation, ScoreCard, RankingModal } from '@/components/unidades';
 import { MembroDetailModal } from '@/components/membros';
@@ -390,14 +390,22 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
           gritoDeGuerra={unidade.grito_de_guerra}
         />
 
-        <AppButton
-          variant="primary"
-          onClick={() => setShowRanking(true)}
-          className="w-full"
-        >
-          <Trophy className="w-5 h-5 mr-2" />
-          Ranking
-        </AppButton>
+        <div className="grid grid-cols-2 gap-3">
+          <AppButton
+            variant="primary"
+            onClick={() => setShowRanking(true)}
+          >
+            <Trophy className="w-5 h-5 mr-2" />
+            Ranking
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            onClick={() => router.push(`/unidades/${unidade.id}/avaliacoes`)}
+          >
+            <ClipboardCheck className="w-5 h-5 mr-2" />
+            Avaliar
+          </AppButton>
+        </div>
 
         <TabsNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
