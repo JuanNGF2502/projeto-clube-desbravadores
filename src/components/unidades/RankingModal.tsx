@@ -8,6 +8,7 @@ import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/utils/cn';
+import { formatDateBR } from '@/utils/date';
 import {
   getRankingMembrosDaUnidade,
   getEstatisticasUnidade,
@@ -201,7 +202,7 @@ export function RankingModal({
           <p className="text-sm font-bold text-text-primary leading-none flex items-center justify-center gap-1">
             <Calendar className="w-3 h-3" />
             {ultimaAvaliacao
-              ? new Date(ultimaAvaliacao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+              ? formatDateBR(ultimaAvaliacao, { day: '2-digit', month: '2-digit' })
               : '—'}
           </p>
           <p className="text-[10px] text-muted mt-0.5">avaliação</p>

@@ -199,6 +199,8 @@ export default function MembrosPage() {
       };
 
       if (editandoMembro) {
+        try { await syncProfileFromMembro(editandoMembro.id); } catch (err: any) { console.error('Erro ao sync profile:', err); }
+
         await updateMembro(editandoMembro.id, membroData);
 
         try { await deleteMembroCargos(editandoMembro.id); } catch (err: any) { console.error('Erro ao limpar cargos:', err); }
@@ -206,8 +208,6 @@ export default function MembrosPage() {
 
         try { await deleteMembroClassesAtuais(editandoMembro.id); } catch (err: any) { console.error('Erro ao limpar classes:', err); }
         await salvarClasses(editandoMembro.id);
-
-        try { await syncProfileFromMembro(editandoMembro.id); } catch (err: any) { console.error('Erro ao sync profile:', err); }
 
         addToast({ type: 'success', title: 'Sucesso', message: 'Membro atualizado' });
       } else {

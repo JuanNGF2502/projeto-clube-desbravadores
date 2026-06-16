@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
+import { formatDateBR } from '@/utils/date';
 
 export interface CriterioAvaliacaoDB {
   id: string;
@@ -159,7 +160,7 @@ export async function getHistoricoAvaliacoesMembro(membroId: string) {
     if (!porData[dataKey]) {
       porData[dataKey] = {
         data: av.data,
-        diaSemana: new Date(av.data).toLocaleDateString('pt-BR', { weekday: 'long' }),
+        diaSemana: formatDateBR(av.data, { weekday: 'long' }),
         totalPontos: 0,
         avaliacoes: [],
       };

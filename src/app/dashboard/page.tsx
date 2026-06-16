@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, BookOpen, Award, TrendingUp, Calendar, Star, Loader2 } from 'lucide-react';
+import { Users, BookOpen, Award, TrendingUp, Calendar, Star, Activity, ArrowUpRight, ArrowDownLeft, RefreshCw, GraduationCap, BadgeCheck, LogIn, LogOut } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppStatsCard } from '@/components/ui/AppStatsCard';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
-import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse } from '@/lib/queries';
+import { AppModal } from '@/components/ui/AppModal';
+import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse, getAtividadeRecente } from '@/lib/queries';
+import { getMembrosComProgresso } from '@/lib/queries/classes';
+import { formatDateBR } from '@/utils/date';
 import { DEFAULT_CLASSES } from '@/types';
 import { useClubId, useAuth } from '@/hooks';
 
@@ -20,10 +23,43 @@ interface RankingUnidade {
   posicao: number;
 }
 
+interface MembroClasse {
+  membroId: string;
+  membroNome: string;
+  membroUnidade: string;
+  progressPercentage: number;
+  completedCount: number;
+  totalCount: number;
+}
+
+function getTimelineIcon(tipo: string, className: string) {
+  switch (tipo) {
+    case 'ENTRADA': return <LogIn className={className} />;
+    case 'SAIDA': return <LogOut className={className} />;
+    case 'TROCA_UNIDADE': return <RefreshCw className={className} />;
+    case 'TROCA_CARGO': return <BadgeCheck className={className} />;
+    case 'CONCLUIU_CLASSE':
+    case 'INICIO_CLASSE': return <GraduationCap className={className} />;
+    case 'PROMOCAO': return <ArrowUpRight className={className} />;
+    case 'RECLASSIFICACAO': return <ArrowDownLeft className={className} />;
+    default: return <Activity className={className} />;
+  }
+}
+
+function getTimelineColor(tipo: string) {
+  switch (tipo) {
+    case 'ENTRADA': case 'CONCLUIU_CLASSE': case 'PROMOCAO': return 'text-success';
+    case 'SAIDA': return 'text-danger';
+    case 'TROCA_UNIDADE': case 'RECLASSIFICACAO': return 'text-warning';
+    case 'TROCA_CARGO': return 'text-primary';
+    case 'INICIO_CLASSE': return 'text-info';
+    default: return 'text-muted';
+  }
+}
+
 export default function DashboardPage() {
   const clubId = useClubId();
   const { profile } = useAuth();
-
   const [estatisticas, setEstatisticas] = useState({
     totalMembros: 0,
     membrosAtivos: 0,
@@ -33,21 +69,28 @@ export default function DashboardPage() {
   });
   const [ranking, setRanking] = useState<RankingUnidade[]>([]);
   const [membrosPorClasse, setMembrosPorClasse] = useState<any[]>([]);
+  const [atividades, setAtividades] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [classeModal, setClasseModal] = useState<{ id: string; nome: string; cor: string } | null>(null);
+  const [membrosDaClasse, setMembrosDaClasse] = useState<MembroClasse[]>([]);
+  const [loadingMembros, setLoadingMembros] = useState(false);
 
   useEffect(() => {
     if (!clubId) return;
 
     const carregarDados = async () => {
       try {
-        const [stats, rankingData, classesData] = await Promise.all([
+        const [stats, rankingData, classesData, atividadesData] = await Promise.all([
           getEstatisticasClube(clubId),
           getRankingUnidades(clubId),
           getMembrosPorClasse(clubId),
+          getAtividadeRecente(clubId, 5),
         ]);
         setEstatisticas(stats);
         setRanking(rankingData);
         setMembrosPorClasse(classesData);
+        setAtividades(atividadesData);
       } catch (error) {
         console.error('Erro ao carregar dashboard:', error);
       } finally {
@@ -57,6 +100,20 @@ export default function DashboardPage() {
 
     carregarDados();
   }, [clubId]);
+
+  const abrirClasse = async (classeId: string, classeNome: string, classeCor: string) => {
+    setClasseModal({ id: classeId, nome: classeNome, cor: classeCor });
+    setLoadingMembros(true);
+    setMembrosDaClasse([]);
+    try {
+      const data = await getMembrosComProgresso(clubId, classeId);
+      setMembrosDaClasse(data);
+    } catch (err) {
+      console.error('Erro ao carregar membros da classe:', err);
+    } finally {
+      setLoadingMembros(false);
+    }
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -73,9 +130,9 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <AppLayout title="Dashboard" subtitle="Visao geral do clube">
+      <AppLayout title="Dashboard" subtitle="Visão geral do clube">
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       </AppLayout>
     );
@@ -84,12 +141,7 @@ export default function DashboardPage() {
   return (
     <AppLayout
       title="Dashboard"
-      subtitle="Visao geral do clube"
-      actions={
-        <button className="p-2 rounded-xl bg-card border border-border hover:bg-primary/10 transition-colors">
-          <BellIcon className="w-5 h-5 text-text-primary" />
-        </button>
-      }
+      subtitle="Visão geral do clube"
     >
       <motion.div
         variants={containerVariants}
@@ -97,7 +149,6 @@ export default function DashboardPage() {
         animate="visible"
         className="space-y-6"
       >
-        {/* Welcome Card */}
         <motion.div variants={itemVariants}>
           <AppCard className="relative overflow-hidden">
             <div className="relative z-10">
@@ -109,7 +160,6 @@ export default function DashboardPage() {
           </AppCard>
         </motion.div>
 
-        {/* Stats Grid */}
         <motion.div variants={itemVariants}>
           <div className="grid grid-cols-2 gap-3">
             <AppStatsCard
@@ -126,7 +176,7 @@ export default function DashboardPage() {
               color="success"
             />
             <AppStatsCard
-              label="Classes"
+              label="Classes Concluídas"
               value={estatisticas.totalClassesConcluidas}
               icon={BookOpen}
               color="info"
@@ -140,78 +190,134 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* Ranking Units */}
-        {ranking.length > 0 ? (
-          <motion.div variants={itemVariants}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-text-primary">Ranking de Unidades</h3>
-              <AppBadge variant="primary" size="sm">
-                <TrendingUp className="w-3 h-3" />
-                Este mes
-              </AppBadge>
-            </div>
-            <AppCard padding="sm" className="space-y-3">
-              {ranking.slice(0, 4).map((unit, index) => (
-                <div key={unit.id} className="flex items-center gap-3 py-2">
-                  <span className="w-6 text-sm font-bold text-muted">#{index + 1}</span>
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: `${unit.cores?.[0] || '#3B82F6'}20` }}
-                  >
-                    <Star className="w-5 h-5" style={{ color: unit.cores?.[0] || '#3B82F6' }} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-text-primary">{unit.nome}</p>
-                    <p className="text-xs text-muted">{unit.totalMembros} membros</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-primary">{unit.totalPontos}</p>
-                    <p className="text-xs text-muted">pontos</p>
-                  </div>
+        <div className="grid grid-cols-2 gap-3">
+          {ranking.length > 0 && (
+            <motion.div variants={itemVariants} className="col-span-2">
+              <div className="rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.2)] p-3 h-full" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-text-primary">Top Unidades</h3>
+                  <span className="inline-flex items-center font-medium rounded-full border transition-colors duration-200 bg-primary/20 text-primary border-primary/30 px-2 py-0.5 text-xs gap-1">
+                    <TrendingUp className="w-3 h-3" />
+                    Mês
+                  </span>
                 </div>
-              ))}
-            </AppCard>
-          </motion.div>
-        ) : null}
+                <div className="space-y-2">
+                  {ranking.slice(0, 3).map((unit, index) => (
+                    <div key={unit.id} className="flex items-center gap-2 py-1">
+                      <span className="w-5 text-xs font-bold text-muted">#{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-text-primary truncate">{unit.nome}</p>
+                      </div>
+                      <span className="text-xs font-bold text-primary">{unit.totalPontos}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
 
-        {/* Classes Progress */}
+          {atividades.length > 0 && (
+            <motion.div variants={itemVariants} className="col-span-1">
+              <AppCard padding="sm" className="h-full">
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-text-primary">Atividades</h3>
+                </div>
+                <div className="space-y-2">
+                  {atividades.slice(0, 3).map((ativ: any) => (
+                    <div key={ativ.id} className="flex items-start gap-2">
+                      <div className={getTimelineColor(ativ.tipo)}>
+                        {getTimelineIcon(ativ.tipo, 'w-3 h-3 mt-0.5')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-text-primary truncate">
+                          <span className="font-medium">{ativ.membro_nome}</span>
+                          {' '}{ativ.descricao}
+                        </p>
+                        <p className="text-[10px] text-muted">
+                          {formatDateBR(ativ.data)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </AppCard>
+            </motion.div>
+          )}
+        </div>
+
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-text-primary">Progresso das Classes</h3>
             <Calendar className="w-5 h-5 text-muted" />
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
+          <div className="grid grid-cols-2 gap-3">
             {DEFAULT_CLASSES.map((classe) => {
               const count = membrosPorClasse.find(m => m.classeId === classe.id)?.count || 0;
               return (
                 <AppCard
                   key={classe.id}
                   padding="sm"
-                  className="min-w-[100px] flex-shrink-0 text-center"
+                  className="text-center cursor-pointer hover:brightness-110 transition-all"
                   hover
+                  onClick={() => abrirClasse(classe.id, classe.nome, classe.cor)}
                 >
                   <div
-                    className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
+                    className="w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center"
                     style={{ backgroundColor: `${classe.cor}20` }}
                   >
-                    <BookOpen className="w-5 h-5" style={{ color: classe.cor }} />
+                    <BookOpen className="w-6 h-6" style={{ color: classe.cor }} />
                   </div>
                   <p className="text-sm font-medium text-text-primary">{classe.nome}</p>
-                  <p className="text-xs text-muted">{count} membros</p>
+                  <p className="text-xs text-muted">{count} membro{count !== 1 ? 's' : ''}</p>
                 </AppCard>
               );
             })}
           </div>
         </motion.div>
       </motion.div>
-    </AppLayout>
-  );
-}
 
-function BellIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-    </svg>
+      <AppModal
+        isOpen={!!classeModal}
+        onClose={() => setClasseModal(null)}
+        title={classeModal?.nome || 'Classe'}
+        size="md"
+      >
+        {loadingMembros ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : membrosDaClasse.length > 0 ? (
+          <div className="space-y-3">
+            {membrosDaClasse.map((m) => (
+              <div key={m.membroId} className="p-3 rounded-xl bg-card/50">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                    style={{ backgroundColor: '#6B7280' }}
+                  >
+                    {m.membroNome.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{m.membroNome}</p>
+                    {m.membroUnidade && (
+                      <p className="text-xs text-muted truncate">{m.membroUnidade}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold" style={{ color: 'rgb(139, 92, 246)' }}>{m.progressPercentage}%</p>
+                    <p className="text-xs text-muted">{m.completedCount}/{m.totalCount} req</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 text-sm text-muted">
+            Nenhum membro nesta classe
+          </div>
+        )}
+      </AppModal>
+    </AppLayout>
   );
 }

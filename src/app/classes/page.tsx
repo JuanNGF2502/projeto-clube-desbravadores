@@ -132,7 +132,7 @@ export default function ClassesPage() {
   const { user, profile } = useAuth();
 
   const isInstrutorMode = profile?.role === 'ADMIN' || classesQueInstrui.length > 0;
-  const showAllClasses = profile?.role === 'ADMIN' || classesQueInstrui.length === 0;
+  const showAllClasses = profile?.role === 'ADMIN';
 
   const carregarDados = async () => {
     try {
@@ -495,7 +495,12 @@ export default function ClassesPage() {
     );
   }
 
-  const filteredClasses = showAllClasses ? classes : classes.filter(c => classesQueInstrui.includes(c.id));
+  const classesVisiveis = showAllClasses
+    ? classes
+    : classesQueInstrui.length > 0
+      ? classes.filter(c => classesQueInstrui.includes(c.id))
+      : [];
+  const filteredClasses = classesVisiveis;
   const totalCompletions = filteredClasses.reduce((acc, c) => acc + (c.completedBy || 0), 0);
 
   return (

@@ -7,8 +7,6 @@ export {
   getMembroById,
   getUnidades,
   getUnidadeById,
-  getClasses,
-  getCargos,
   createMembro,
   updateMembro,
   deleteMembro,
@@ -20,9 +18,8 @@ export {
   syncProfileFromMembro,
   createTransicao,
   getTransicoesPorMembro,
-  getProgressoRequisito,
-  updateRequisito,
   concluirClasse,
+  getMembrosPorClasseId,
 } from './membros';
 
 // Unidades

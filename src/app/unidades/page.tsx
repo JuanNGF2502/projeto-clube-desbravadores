@@ -103,8 +103,11 @@ export default function UnitsPage() {
       }).catch(() => {
         setUnidadesQueOrienta([]);
       });
+    } else if (profile.role === 'LIDER') {
+      const todasUnidades = units.map(u => u.id);
+      setUnidadesQueOrienta(todasUnidades);
     }
-  }, [user, profile, podeGerenciarUnidades]);
+  }, [user, profile, podeGerenciarUnidades, units]);
 
   const filteredUnits = useMemo(() => {
     let result = podeGerenciarUnidades ? units : units.filter(u => unidadesQueOrienta.includes(u.id));

@@ -350,7 +350,6 @@ export default function ProfilePage() {
         </AppCard>
       </motion.div>
 
-
       {/* Especialidades */}
       {especialidades.length > 0 && (
         <motion.div

@@ -9,6 +9,7 @@ import { Inter } from 'next/font/google';
 
 import { AppProvider } from '@/providers/AppProvider';
 import { PWABanner } from '@/components/pwa';
+import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -110,6 +111,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <AppProvider>
+          <ServiceWorkerRegister />
           <PWABanner />
           {children}
         </AppProvider>

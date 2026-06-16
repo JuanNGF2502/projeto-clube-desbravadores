@@ -217,6 +217,83 @@ export async function getMembrosPorClasse(_clubeId: string): Promise<MembrosPorC
 }
 
 // ============================================
+// EVOLUÇÃO DE MEMBROS (últimos N meses)
+// ============================================
+
+export interface EvolucaoMensal {
+  mes: string;
+  entradas: number;
+  saidas: number;
+  saldo: number;
+  total: number;
+}
+
+export async function getEvolucaoMembros(clubeId: string, meses: number = 6): Promise<EvolucaoMensal[]> {
+  const { data: membros } = await supabase
+    .from('membros')
+    .select('id, created_at, data_desligamento')
+    .eq('clube_id', clubeId);
+
+  if (!membros || membros.length === 0) return [];
+
+  const hoje = new Date();
+  const resultado: EvolucaoMensal[] = [];
+
+  for (let i = meses - 1; i >= 0; i--) {
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() - i + 1, 0);
+
+    const entradas = membros.filter(m => {
+      const created = new Date(m.created_at);
+      return created >= inicioMes && created <= fimMes;
+    }).length;
+
+    const saidas = membros.filter(m => {
+      if (!m.data_desligamento) return false;
+      const deslig = new Date(m.data_desligamento);
+      return deslig >= inicioMes && deslig <= fimMes;
+    }).length;
+
+    const ateFimMes = membros.filter(m => {
+      const created = new Date(m.created_at);
+      if (created > fimMes) return false;
+      if (!m.data_desligamento) return true;
+      return new Date(m.data_desligamento) > fimMes;
+    }).length;
+
+    resultado.push({
+      mes: inicioMes.toLocaleDateString('pt-BR', { month: 'short' }),
+      entradas,
+      saidas,
+      saldo: entradas - saidas,
+      total: ateFimMes,
+    });
+  }
+
+  return resultado;
+}
+
+// ============================================
+// DISTRIBUIÇÃO POR SEXO
+// ============================================
+
+export async function getDistribuicaoSexo(clubeId: string): Promise<{ masculino: number; feminino: number }> {
+  const { count: masculino } = await supabase
+    .from('membros')
+    .select('*', { count: 'exact', head: true })
+    .eq('clube_id', clubeId)
+    .eq('sexo', 'M');
+
+  const { count: feminino } = await supabase
+    .from('membros')
+    .select('*', { count: 'exact', head: true })
+    .eq('clube_id', clubeId)
+    .eq('sexo', 'F');
+
+  return { masculino: masculino || 0, feminino: feminino || 0 };
+}
+
+// ============================================
 // AVALIAÇÕES SEMANAIS
 // ============================================
 

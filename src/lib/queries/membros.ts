@@ -174,6 +174,7 @@ export async function updateMembro(id: string, membro: Record<string, any>) {
     .single();
 
   if (error) throw error;
+  if (!data) throw new Error('Nenhum registro foi atualizado. Verifique se você tem permissão para editar este membro.');
   return data;
 }
 
@@ -284,160 +285,38 @@ export async function deleteMembroClassesAtuais(membroId: string) {
 // CLASSES
 // ============================================
 
-export async function getClasses() {
-  const { data, error } = await supabase
-    .from('classes')
-    .select('*')
-    .eq('ativo', true)
-    .order('ordem');
+export async function getMembrosPorClasseId(classeId: string) {
+  const { data: relacoes } = await supabase
+    .from('membros_classes_atuais')
+    .select('membro_id')
+    .eq('classe_id', classeId);
 
-  if (error) throw error;
-  return data;
-}
+  if (!relacoes || relacoes.length === 0) return [];
 
-export async function getClasseById(id: string) {
-  const { data, error } = await supabase
-    .from('classes')
-    .select('*')
-    .eq('id', id)
-    .single();
+  const membroIds = relacoes.map(r => r.membro_id);
 
-  if (error) throw error;
-  return data;
-}
+  const { data: membros } = await supabase
+    .from('membros')
+    .select('id, nome, foto, unidade_id, sexo')
+    .in('id', membroIds)
+    .eq('ativo', true);
 
-// ============================================
-// REQUISITOS DAS CLASSES
-// ============================================
+  if (!membros || membros.length === 0) return [];
 
-export async function getRequisitosByClasse(classeId: string) {
-  const { data, error } = await supabase
-    .from('requisitos_classe')
-    .select('*')
-    .eq('classe_id', classeId)
-    .eq('ativo', true)
-    .order('ordem');
+  const unidadeIds = [...new Set(membros.map(m => m.unidade_id).filter(Boolean))];
 
-  if (error) throw error;
-  return data;
-}
+  const { data: unidades } = await supabase
+    .from('unidades')
+    .select('id, nome, cores')
+    .in('id', unidadeIds);
 
-export async function getProgressoRequisito(membroId: string, requisitoId: string) {
-  const { data, error } = await supabase
-    .from('membros_requisitos')
-    .select('*')
-    .eq('membro_id', membroId)
-    .eq('requisito_id', requisitoId)
-    .single();
-
-  if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-  return data;
-}
-
-export async function updateRequisito(membroId: string, requisitoId: string, completado: boolean) {
-  const { data, error } = await supabase
-    .from('membros_requisitos')
-    .upsert({
-      membro_id: membroId,
-      requisito_id: requisitoId,
-      completado,
-      data_conclusao: completado ? new Date().toISOString() : null,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// ============================================
-// ESPECIALIDADES
-// ============================================
-
-export async function getEspecialidades(categoria?: string) {
-  let query = supabase
-    .from('especialidades')
-    .select('*')
-    .eq('ativo', true)
-    .order('nome');
-
-  if (categoria) {
-    query = query.eq('categoria', categoria);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return data;
-}
-
-// ============================================
-// CARGOS
-// ============================================
-
-export async function getCargos() {
-  const { data, error } = await supabase
-    .from('cargos')
-    .select('*')
-    .order('nivel');
-
-  if (error) throw error;
-  return data;
-}
-
-// ============================================
-// AVALIAÇÕES
-// ============================================
-
-export async function getAvaliacoesPorMembro(membroId: string) {
-  const { data, error } = await supabase
-    .from('avaliacoes')
-    .select('*')
-    .eq('membro_id', membroId)
-    .order('data', { ascending: false });
-
-  if (error) throw error;
-  return data;
-}
-
-export async function getAvaliacoesPorUnidade(unidadeId: string, dataInicio?: string, dataFim?: string) {
-  let query = supabase
-    .from('avaliacoes')
-    .select(`
-      *,
-      membro:membros(nome, foto)
-    `)
-    .eq('unidade_id', unidadeId);
-
-  if (dataInicio) {
-    query = query.gte('data', dataInicio);
-  }
-  if (dataFim) {
-    query = query.lte('data', dataFim);
-  }
-
-  const { data, error } = await query.order('data', { ascending: false });
-
-  if (error) throw error;
-  return data;
-}
-
-export async function createAvaliacao(avaliacao: {
-  membro_id: string;
-  unidade_id: string;
-  criterio_id: string;
-  nivel: string;
-  pontos: number;
-  observacao?: string;
-}) {
-  const { data, error } = await supabase
-    .from('avaliacoes')
-    .insert(avaliacao)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  return membros.map(m => ({
+    id: m.id,
+    nome: m.nome,
+    foto: m.foto,
+    sexo: m.sexo,
+    unidade: unidades?.find(u => u.id === m.unidade_id) || null,
+  }));
 }
 
 // ============================================
@@ -467,25 +346,6 @@ export async function createTransicao(transicao: {
   const { data, error } = await supabase
     .from('transicoes')
     .insert(transicao)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// ============================================
-// CLASSES DO MEMBRO
-// ============================================
-
-export async function addClasseAtual(membroId: string, classeId: string) {
-  const { data, error } = await supabase
-    .from('membros_classes_atuais')
-    .insert({
-      membro_id: membroId,
-      classe_id: classeId,
-      data_inicio: new Date().toISOString().split('T')[0],
-    })
     .select()
     .single();
 
@@ -528,27 +388,6 @@ export async function concluirClasse(membroId: string, classeId: string) {
   return data;
 }
 
-// ============================================
-// MEMBRO-CARGO
-// ============================================
-
-export async function addCargo(membroId: string, cargoTipo: string, unidadeId?: string) {
-  const { data, error } = await supabase
-    .from('membros_cargos')
-    .insert({
-      membro_id: membroId,
-      cargo_tipo: cargoTipo,
-      unidade_id: unidadeId,
-      data_atribuicao: new Date().toISOString().split('T')[0],
-      ativo: true,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
 export async function syncProfileFromMembro(membroId: string) {
   const { error } = await supabase.rpc('sync_profile_from_membro', {
     p_membro_id: membroId,
@@ -556,16 +395,6 @@ export async function syncProfileFromMembro(membroId: string) {
   if (error) {
     console.error('Erro syncProfileFromMembro:', error);
   }
-}
-
-export async function removeCargo(membroId: string, cargoTipo: string) {
-  const { error } = await supabase
-    .from('membros_cargos')
-    .update({ ativo: false })
-    .eq('membro_id', membroId)
-    .eq('cargo_tipo', cargoTipo);
-
-  if (error) throw error;
 }
 
 export async function getClassesQueInstrutorEnsinaPorCargo(membroId: string): Promise<string[]> {

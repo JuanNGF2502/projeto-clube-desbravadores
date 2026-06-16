@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Calendar, Phone, Mail, Shield, Users, Star, Clock, Award, History, ArrowUpRight, ArrowDownLeft, RefreshCw, GraduationCap, BadgeCheck, LogIn, LogOut, Pencil, ClipboardCheck, TrendingUp, KeyRound } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { User, Calendar, Phone, Mail, Shield, Users, Star, Clock, Award, History, ArrowUpRight, BadgeCheck, Pencil, ClipboardCheck, TrendingUp, KeyRound, ExternalLink } from 'lucide-react';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppButton } from '@/components/ui/AppButton';
 import { cn } from '@/utils/cn';
+import { formatDateBR } from '@/utils/date';
 import {
   Usuario,
   Cargo,
@@ -22,6 +24,7 @@ import { getHistoricoAvaliacoesMembro, getEstatisticasAvaliacaoMembro } from '@/
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/hooks/useAuth';
 import { CriarAcessoModal } from './CriarAcessoModal';
+import { TimelineItem } from './TimelineItem';
 
 interface MembroDetailModalProps {
   isOpen: boolean;
@@ -49,6 +52,7 @@ export function MembroDetailModal({
   const [showCriarAcesso, setShowCriarAcesso] = useState(false);
   const { addToast } = useToast();
   const { isAdmin } = useAuth();
+  const router = useRouter();
 
   const handleConcluirClasse = async (classeId: string) => {
     if (!membro) return;
@@ -429,7 +433,7 @@ export function MembroDetailModal({
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-muted" />
                             <span className="text-sm font-medium text-text-primary">
-                              {new Date(avaliacaoDia.data).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                              {formatDateBR(avaliacaoDia.data, { day: '2-digit', month: 'short' })}
                             </span>
                             <span className="text-xs text-muted capitalize">({avaliacaoDia.diaSemana})</span>
                           </div>
@@ -471,10 +475,19 @@ export function MembroDetailModal({
 
         {/* Timeline de Histórico */}
         <AppCard padding="sm">
-          <h3 className="font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <History className="w-4 h-4 text-primary" />
-            Histórico de Atividades
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-text-primary flex items-center gap-2">
+              <History className="w-4 h-4 text-primary" />
+              Histórico de Atividades
+            </h3>
+            <button
+              onClick={() => router.push(`/membros/${membro.id}/timeline`)}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              Ver todas
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          </div>
 
           {carregandoTransicoes ? (
             <div className="flex items-center justify-center py-4">
@@ -483,13 +496,20 @@ export function MembroDetailModal({
             </div>
           ) : transicoes.length > 0 ? (
             <div className="relative">
-              {/* Linha vertical */}
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
 
-              <div className="space-y-4">
-                {transicoes.map((transicao, index) => (
-                  <TimelineItem key={transicao.id || index} transicao={transicao} />
+              <div className="space-y-0">
+                {transicoes.slice(0, 5).map((transicao) => (
+                  <TimelineItem key={transicao.id} item={transicao} />
                 ))}
+                {transicoes.length > 5 && (
+                  <button
+                    onClick={() => router.push(`/membros/${membro.id}/timeline`)}
+                    className="text-sm text-primary hover:underline ml-11 mt-1"
+                  >
+                    Ver mais {transicoes.length - 5} registros
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -514,103 +534,3 @@ export function MembroDetailModal({
   );
 }
 
-// Componente para cada item da timeline
-function TimelineItem({ transicao }: { transicao: Transicao }) {
-  const getIcon = () => {
-    switch (transicao.tipo) {
-      case 'ENTRADA':
-        return <LogIn className="w-4 h-4" />;
-      case 'SAIDA':
-        return <LogOut className="w-4 h-4" />;
-      case 'TROCA_UNIDADE':
-        return <RefreshCw className="w-4 h-4" />;
-      case 'TROCA_CARGO':
-        return <BadgeCheck className="w-4 h-4" />;
-      case 'CONCLUIU_CLASSE':
-      case 'INICIO_CLASSE':
-        return <GraduationCap className="w-4 h-4" />;
-      case 'PROMOCAO':
-        return <ArrowUpRight className="w-4 h-4" />;
-      case 'RECLASSIFICACAO':
-        return <ArrowDownLeft className="w-4 h-4" />;
-      default:
-        return <History className="w-4 h-4" />;
-    }
-  };
-
-  const getColor = () => {
-    switch (transicao.tipo) {
-      case 'ENTRADA':
-        return 'bg-success text-success';
-      case 'SAIDA':
-        return 'bg-danger text-danger';
-      case 'TROCA_UNIDADE':
-        return 'bg-warning text-warning';
-      case 'TROCA_CARGO':
-        return 'bg-primary text-primary';
-      case 'CONCLUIU_CLASSE':
-        return 'bg-success text-success';
-      case 'INICIO_CLASSE':
-        return 'bg-info text-info';
-      case 'PROMOCAO':
-        return 'bg-success text-success';
-      case 'RECLASSIFICACAO':
-        return 'bg-warning text-warning';
-      default:
-        return 'bg-muted text-muted';
-    }
-  };
-
-  const getLabel = () => {
-    switch (transicao.tipo) {
-      case 'ENTRADA':
-        return 'Entrada no Clube';
-      case 'SAIDA':
-        return 'Saída do Clube';
-      case 'TROCA_UNIDADE':
-        return 'Transferência de Unidade';
-      case 'TROCA_CARGO':
-        return 'Mudança de Cargo';
-      case 'CONCLUIU_CLASSE':
-        return 'Conclusão de Classe';
-      case 'INICIO_CLASSE':
-        return 'Início de Classe';
-      case 'PROMOCAO':
-        return 'Promoção';
-      case 'RECLASSIFICACAO':
-        return 'Reclassificação';
-      default:
-        return 'Atualização';
-    }
-  };
-
-  const formatarData = (data: Date | string): string => {
-    const d = new Date(data);
-    return d.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
-  return (
-    <div className="relative flex items-start gap-3 pl-2">
-      {/* Ícone */}
-      <div className={cn('relative z-10 flex items-center justify-center w-8 h-8 rounded-full', getColor())}>
-        {getIcon()}
-      </div>
-
-      {/* Conteúdo */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm text-text-primary">{getLabel()}</span>
-          <span className="text-xs text-muted">{formatarData(transicao.data)}</span>
-        </div>
-        <p className="text-sm text-muted mt-0.5">{transicao.descricao}</p>
-        {transicao.observacoes && (
-          <p className="text-xs text-muted mt-1 italic">{transicao.observacoes}</p>
-        )}
-      </div>
-    </div>
-  );
-}
