@@ -815,7 +815,7 @@ export default function ClassesPage() {
         onClose={handleRequirementsModalClose}
         initialProgress={selectedClassProgress || selectedMemberProgress}
         onSaveProgress={selectedMemberProgress ? handleSaveProgress : undefined}
-        modoInstrutor={isInstrutorMode}
+        modoInstrutor={isInstrutorMode && !!selectedClassProgress}
         onSalvarInstrucao={isInstrutorMode && selectedClassProgress ? handleSalvarInstrucao : undefined}
         instrucaoProgress={instrucaoProgress || undefined}
         onConcluirClasse={selectedMemberProgress ? handleConcluirClasse : undefined}
