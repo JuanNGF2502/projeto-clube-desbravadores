@@ -10,7 +10,6 @@ import { AppBadge } from '@/components/ui/AppBadge';
 import { AppModal } from '@/components/ui/AppModal';
 import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse, getAtividadeRecente } from '@/lib/queries';
 import { getMembrosComProgresso } from '@/lib/queries/classes';
-import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { formatDateBR } from '@/utils/date';
 import { DEFAULT_CLASSES } from '@/types';
 import { useClubId, useAuth } from '@/hooks';
@@ -61,7 +60,6 @@ function getTimelineColor(tipo: string) {
 export default function DashboardPage() {
   const clubId = useClubId();
   const { profile } = useAuth();
-  const { oculta } = usePontuacao();
   const [estatisticas, setEstatisticas] = useState({
     totalMembros: 0,
     membrosAtivos: 0,
@@ -193,30 +191,18 @@ export default function DashboardPage() {
         </motion.div>
 
         <div className="grid grid-cols-2 gap-3">
-          {ranking.length > 0 && (
-            <motion.div variants={itemVariants} className="col-span-2">
-              <div className="rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.2)] p-3 h-full" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-text-primary">Top Unidades</h3>
-                  <span className="inline-flex items-center font-medium rounded-full border transition-colors duration-200 bg-primary/20 text-primary border-primary/30 px-2 py-0.5 text-xs gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    Mês
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {ranking.slice(0, 3).map((unit, index) => (
-                    <div key={unit.id} className="flex items-center gap-2 py-1">
-                      <span className="w-5 text-xs font-bold text-muted">#{index + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-text-primary truncate">{unit.nome}</p>
-                      </div>
-                      <span className="text-xs font-bold text-primary">{oculta ? '—' : unit.totalPontos}</span>
-                    </div>
-                  ))}
-                </div>
+          <motion.div variants={itemVariants} className="col-span-2">
+            <div className="rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.2)] p-3 h-full" style={{ backgroundColor: 'var(--card-color)', border: '1px solid var(--border-color)' }}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-text-primary">Top Unidades</h3>
+                <span className="inline-flex items-center font-medium rounded-full border transition-colors duration-200 bg-primary/20 text-primary border-primary/30 px-2 py-0.5 text-xs gap-1">
+                  <TrendingUp className="w-3 h-3" />
+                  Mês
+                </span>
               </div>
-            </motion.div>
-          )}
+              <p className="text-sm text-muted text-center py-4">Resultados em breve</p>
+            </div>
+          </motion.div>
 
           {atividades.length > 0 && (
             <motion.div variants={itemVariants} className="col-span-1">
