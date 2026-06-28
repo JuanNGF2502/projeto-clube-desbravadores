@@ -12,3 +12,6 @@ DELETE FROM especialidades;
 
 -- 3. Remove a constraint existente (se houver CHECK constraint)
 ALTER TABLE especialidades DROP CONSTRAINT IF EXISTS especialidades_categoria_check;
+
+-- 4. Remove coluna nivel (não será mais usada)
+ALTER TABLE especialidades DROP COLUMN IF EXISTS nivel;

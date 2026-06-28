@@ -400,7 +400,6 @@ export interface Especialidade {
   nome: string;
   categoria: EspecialidadeCategoria;
   descricao?: string;
-  nivel: 1 | 2 | 3;
   imagem?: string;
   requisitos?: string[];
 }

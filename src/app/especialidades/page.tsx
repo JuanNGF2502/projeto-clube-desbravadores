@@ -23,7 +23,6 @@ interface Especialidade {
   nome: string;
   categoria: string;
   descricao?: string;
-  nivel: number;
   imagem?: string;
   ativo: boolean;
 }
@@ -41,7 +40,6 @@ export default function EspecialidadesPage() {
     nome: '',
     categoria: SPECIALTY_CATEGORIES[0],
     descricao: '',
-    nivel: 1,
   });
   // Atribuição de especialidades
   const [assignEsp, setAssignEsp] = useState<Especialidade | null>(null);
@@ -90,11 +88,10 @@ export default function EspecialidadesPage() {
         nome: esp.nome,
         categoria: esp.categoria as EspecialidadeCategoria,
         descricao: esp.descricao || '',
-        nivel: esp.nivel,
       });
     } else {
       setEditingEsp(null);
-      setFormData({ nome: '', categoria: SPECIALTY_CATEGORIES[0], descricao: '', nivel: 1 });
+      setFormData({ nome: '', categoria: SPECIALTY_CATEGORIES[0], descricao: '' });
     }
     setIsModalOpen(true);
   };
@@ -113,7 +110,6 @@ export default function EspecialidadesPage() {
             nome: formData.nome,
             categoria: formData.categoria,
             descricao: formData.descricao || null,
-            nivel: formData.nivel,
           })
           .eq('id', editingEsp.id);
         if (error) throw error;
@@ -125,7 +121,6 @@ export default function EspecialidadesPage() {
             nome: formData.nome,
             categoria: formData.categoria,
             descricao: formData.descricao || null,
-            nivel: formData.nivel,
             ativo: true,
           });
         if (error) throw error;
@@ -203,11 +198,6 @@ export default function EspecialidadesPage() {
       console.error('Erro ao remover:', error);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao remover atribuição' });
     }
-  };
-
-  const getNivelLabel = (nivel: number) => {
-    const labels: Record<number, string> = { 1: 'Básico', 2: 'Intermediário', 3: 'Avançado' };
-    return labels[nivel] || 'Básico';
   };
 
   if (isLoading) {
@@ -293,9 +283,6 @@ export default function EspecialidadesPage() {
                         <AppBadge size="sm" variant="primary">
                           {esp.categoria}
                         </AppBadge>
-                        <AppBadge size="sm" variant={esp.nivel === 3 ? 'warning' : esp.nivel === 2 ? 'info' : 'secondary'}>
-                          {getNivelLabel(esp.nivel)}
-                        </AppBadge>
                       </div>
                       {esp.descricao && (
                         <p className="text-xs text-muted mt-1 line-clamp-1">{esp.descricao}</p>
@@ -345,24 +332,6 @@ export default function EspecialidadesPage() {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-1 block">Nível *</label>
-            <div className="flex gap-2">
-              {[1, 2, 3].map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, nivel: n })}
-                  className={cn(
-                    'flex-1 py-2.5 rounded-xl text-sm font-medium transition-all',
-                    formData.nivel === n ? 'bg-primary text-white' : 'border bg-card text-muted'
-                  )}
-                >
-                  {getNivelLabel(n)}
-                </button>
-              ))}
-            </div>
           </div>
           <AppTextarea
             label="Descrição"
