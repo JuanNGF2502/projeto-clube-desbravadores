@@ -129,9 +129,9 @@ export default function EspecialidadesPage() {
       setIsModalOpen(false);
       setEditingEsp(null);
       await carregarDados();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar especialidade' });
+    } catch (error: any) {
+      console.error('Erro ao salvar:', JSON.stringify(error));
+      addToast({ type: 'error', title: 'Erro', message: error?.message || 'Falha ao salvar especialidade' });
     } finally {
       setSaving(false);
     }
