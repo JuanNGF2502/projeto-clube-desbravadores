@@ -24,6 +24,14 @@ import { useClubId } from '@/hooks';
 import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { formatDateBR, toLocalDateString } from '@/utils/date';
 
+const SQL_MIGRATION = `ALTER TABLE clubes ADD COLUMN IF NOT EXISTS pontuacao_oculta BOOLEAN NOT NULL DEFAULT false;
+
+DROP POLICY IF EXISTS clubes_select ON clubes;
+CREATE POLICY clubes_select ON clubes FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS clubes_update ON clubes;
+CREATE POLICY clubes_update ON clubes FOR UPDATE USING (public.get_user_role() = 'ADMIN') WITH CHECK (public.get_user_role() = 'ADMIN');`;
+
 export default function ProfilePage() {
   const router = useRouter();
   const { addToast } = useToast();
@@ -52,13 +60,44 @@ export default function ProfilePage() {
   });
 
   // Avaliação session management state
-  const { oculta: pontuacaoOculta, toggle: togglePontuacao } = usePontuacao();
+  const { oculta: pontuacaoOculta, toggle: togglePontuacao, exists: colunaExiste } = usePontuacao();
   const [showSessaoModal, setShowSessaoModal] = useState(false);
   const [sessoesPorUnidade, setSessoesPorUnidade] = useState<Record<string, SessaoAvaliacao[]>>({});
   const [batchDate, setBatchDate] = useState(toLocalDateString());
   const [criandoBatch, setCriandoBatch] = useState(false);
   const [editandoSessaoId, setEditandoSessaoId] = useState<string | null>(null);
   const [editandoData, setEditandoData] = useState('');
+
+  // Setup pontuação state
+  const [setupStatus, setSetupStatus] = useState<'idle' | 'loading' | 'ready' | 'needs-setup'>('idle');
+  const [setupSql, setSetupSql] = useState('');
+  const [setupMessage, setSetupMessage] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const verificarSetup = async () => {
+    if (!isAdmin) return;
+    setSetupStatus('loading');
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) throw new Error('Sem sessão');
+      const res = await fetch('/api/setup-pontuacao', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.needsSetup) {
+        setSetupStatus('needs-setup');
+        setSetupSql(data.sql || SQL_MIGRATION);
+        setSetupMessage(data.message || '');
+      } else {
+        setSetupStatus('ready');
+        setSetupMessage(data.message || 'Sistema pronto!');
+      }
+    } catch {
+      setSetupStatus('needs-setup');
+      setSetupSql(SQL_MIGRATION);
+      setSetupMessage('Não foi possível verificar. Execute o SQL manualmente no Supabase Dashboard.');
+    }
+  };
 
   const carregarUnidades = async () => {
     if (!CLUB_ID) return;
@@ -141,7 +180,10 @@ export default function ProfilePage() {
 
   const openSessaoModal = () => {
     setShowSessaoModal(true);
+    setSetupStatus('idle');
+    setCopied(false);
     carregarSessoesTodasUnidades();
+    verificarSetup();
   };
 
   useEffect(() => {
@@ -470,6 +512,88 @@ export default function ProfilePage() {
               />
             </div>
           </button>
+
+          {/* Status de sincronização global */}
+          {colunaExiste ? (
+            <div className="flex items-center gap-2 p-3 rounded-xl border border-success/30 bg-success/5 text-xs text-success">
+              <div className="w-2 h-2 rounded-full bg-success flex-shrink-0" />
+              Sincronização global ativa — todos os usuários veem a mesma configuração
+            </div>
+          ) : setupStatus === 'loading' ? (
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              Verificando configuração do banco...
+            </div>
+          ) : setupStatus === 'needs-setup' ? (
+            <button
+              onClick={verificarSetup}
+              className="w-full flex items-center gap-2 p-3 rounded-xl border border-warning/30 bg-warning/5 text-xs text-warning"
+            >
+              <div className="w-2 h-2 rounded-full bg-warning animate-pulse flex-shrink-0" />
+              <span className="text-left">Sincronização global não configurada. Clique para ver o SQL necessário.</span>
+            </button>
+          ) : setupStatus === 'ready' ? (
+            <div className="flex items-center gap-2 p-3 rounded-xl border border-success/30 bg-success/5 text-xs text-success">
+              <div className="w-2 h-2 rounded-full bg-success flex-shrink-0" />
+              Sincronização global ativa
+            </div>
+          ) : null}
+
+          {/* Setup modal (exibe o SQL) */}
+          <AppModal
+            isOpen={setupStatus === 'needs-setup'}
+            onClose={() => setSetupStatus('idle')}
+            title="Configurar Sincronização Global"
+            description="A coluna pontuacao_oculta precisa ser criada no banco de dados."
+            size="lg"
+            scrollable
+          >
+            <div className="space-y-4">
+              <p className="text-xs text-muted">
+                {setupMessage}
+              </p>
+              <div className="relative">
+                <pre className="text-xs font-mono bg-background rounded-xl p-4 overflow-x-auto whitespace-pre-wrap text-text-primary border border-border">
+                  {setupSql}
+                </pre>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(setupSql);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="absolute top-2 right-2 p-2 rounded-lg bg-surface hover:bg-card transition-colors text-xs text-muted"
+                >
+                  {copied ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
+              <div className="p-3 rounded-xl bg-surface border border-border">
+                <p className="text-xs font-semibold text-text-primary mb-1">Instruções:</p>
+                <ol className="text-xs text-muted space-y-1 list-decimal list-inside">
+                  <li>Acesse o <strong>Supabase Dashboard</strong></li>
+                  <li>Vá em <strong>SQL Editor</strong></li>
+                  <li>Cole o SQL acima e clique em <strong>Run</strong></li>
+                  <li>Após executar, volte aqui e clique em <strong>Verificar novamente</strong></li>
+                </ol>
+              </div>
+              <div className="flex gap-2">
+                <AppButton variant="secondary" className="flex-1" onClick={() => setSetupStatus('idle')}>
+                  Fechar
+                </AppButton>
+                <AppButton variant="primary" className="flex-1" onClick={verificarSetup}>
+                  Verificar novamente
+                </AppButton>
+              </div>
+              <a
+                href={`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('.supabase.co', '.supabase.co/project')}/sql/new`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-center text-xs text-primary underline"
+              >
+                Abrir Supabase SQL Editor
+              </a>
+            </div>
+          </AppModal>
 
           <div className="border-t border-border pt-4">
             <h4 className="text-sm font-semibold text-text-primary mb-3">Sessões por Unidade</h4>

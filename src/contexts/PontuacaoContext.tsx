@@ -9,12 +9,14 @@ const LS_KEY = 'pontuacao_oculta';
 interface PontuacaoContextType {
   oculta: boolean;
   isLoading: boolean;
+  exists: boolean;
   toggle: () => void;
 }
 
 const PontuacaoContext = createContext<PontuacaoContextType>({
   oculta: false,
   isLoading: true,
+  exists: false,
   toggle: () => {},
 });
 
@@ -36,16 +38,22 @@ export function PontuacaoProvider({ children }: { children: ReactNode }) {
   const clubId = useClubId();
   const { isAdmin } = useAuth();
   const [oculta, setOculta] = useState(lerLocalStorage);
-  const [isLoading, setIsLoading] = useState(false);
+  const [exists, setExists] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!clubId) return;
-    getPontuacaoOculta(clubId).then((val) => {
-      if (val) {
-        setOculta(true);
-        salvarLocalStorage(true);
+    if (!clubId) {
+      setIsLoading(false);
+      return;
+    }
+
+    getPontuacaoOculta(clubId).then((res) => {
+      if (res.exists) {
+        setOculta(res.value);
+        salvarLocalStorage(res.value);
+        setExists(true);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, [clubId]);
 
   const toggle = useCallback(() => {
@@ -53,11 +61,13 @@ export function PontuacaoProvider({ children }: { children: ReactNode }) {
     const novoValor = !oculta;
     setOculta(novoValor);
     salvarLocalStorage(novoValor);
-    setPontuacaoOculta(clubId, novoValor).catch(() => {});
+    setPontuacaoOculta(clubId, novoValor).then((res) => {
+      if (res.exists) setExists(true);
+    });
   }, [oculta, isAdmin, clubId]);
 
   return (
-    <PontuacaoContext.Provider value={{ oculta, isLoading, toggle }}>
+    <PontuacaoContext.Provider value={{ oculta, isLoading, exists, toggle }}>
       {children}
     </PontuacaoContext.Provider>
   );
