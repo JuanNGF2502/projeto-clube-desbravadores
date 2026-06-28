@@ -1,6 +1,6 @@
-const CACHE_NAME = 'desbravadores-v4';
-const STATIC_CACHE = 'desbravadores-static-v3';
-const API_CACHE = 'desbravadores-api-v3';
+const CACHE_NAME = 'desbravadores-v5';
+const STATIC_CACHE = 'desbravadores-static-v5';
+const API_CACHE = 'desbravadores-api-v5';
 const OFFLINE_URL = '/offline';
 
 self.addEventListener('install', (event) => {
@@ -53,15 +53,24 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(networkFirst(request, CACHE_NAME));
 });
 
+function isCacheable(response) {
+  if (!response.ok) return false;
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) return false;
+  return true;
+}
+
 async function cacheFirst(request, cacheName) {
   const cached = await caches.match(request);
   if (cached) return cached;
 
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (isCacheable(response)) {
       const cache = await caches.open(cacheName);
       cache.put(request, response.clone());
+    } else if (response.ok) {
+      return response;
     }
     return response;
   } catch {
@@ -72,9 +81,11 @@ async function cacheFirst(request, cacheName) {
 async function networkFirst(request, cacheName) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (isCacheable(response)) {
       const cache = await caches.open(cacheName);
       cache.put(request, response.clone());
+    } else if (response.ok) {
+      return response;
     }
     return response;
   } catch {
