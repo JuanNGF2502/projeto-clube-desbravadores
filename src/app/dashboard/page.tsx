@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, BookOpen, Award, TrendingUp, Calendar, Star, Activity, ArrowUpRight, ArrowDownLeft, RefreshCw, GraduationCap, BadgeCheck, LogIn, LogOut } from 'lucide-react';
+import { Users, BookOpen, Award, TrendingUp, Calendar, Star, Activity, ArrowUpRight, ArrowDownLeft, RefreshCw, GraduationCap, BadgeCheck, LogIn, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppStatsCard } from '@/components/ui/AppStatsCard';
 import { AppCard } from '@/components/ui/AppCard';
@@ -58,6 +58,56 @@ function getTimelineColor(tipo: string) {
     case 'INICIO_CLASSE': return 'text-info';
     default: return 'text-muted';
   }
+}
+
+function EspMembroRow({ data }: { data: MembroEspecialidadesResumo }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl bg-card/50 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 p-3 text-left"
+      >
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 bg-primary">
+          {data.membro.nome.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-text-primary truncate">{data.membro.nome}</p>
+          {data.membro.unidade && (
+            <p className="text-xs text-muted truncate">{data.membro.unidade.nome}</p>
+          )}
+        </div>
+        <span className="text-xs font-bold text-warning">{data.especialidades.length}</span>
+        {open ? <ChevronDown className="w-4 h-4 text-muted" /> : <ChevronRight className="w-4 h-4 text-muted" />}
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
+          {data.especialidades.map(esp => (
+            <div key={esp.id} className="text-xs">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`inline-flex items-center gap-1 font-medium rounded-full px-2 py-0.5 ${
+                    esp.concluido
+                      ? 'bg-success/20 text-success'
+                      : 'bg-warning/20 text-warning'
+                  }`}
+                >
+                  {esp.nome}
+                </span>
+                <span className="text-muted">{esp.categoria}</span>
+              </div>
+              <div className="mt-1 space-y-0.5 text-muted ml-1">
+                {esp.data_inicio && <p>Início: {formatDateBR(esp.data_inicio)}</p>}
+                {esp.data_conclusao && <p>Conclusão: {formatDateBR(esp.data_conclusao)}</p>}
+                {esp.instrutor && <p>Instrutor: {esp.instrutor}</p>}
+                {esp.descricao && <p className="text-text-secondary line-clamp-2">{esp.descricao}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -354,38 +404,11 @@ export default function DashboardPage() {
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : membrosEsp.length > 0 ? (
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-1 max-h-[60vh] overflow-y-auto">
             {membrosEsp
               .filter(m => m.especialidades.length > 0)
               .map(m => (
-                <div key={m.membro.id} className="p-3 rounded-xl bg-card/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 bg-primary">
-                      {m.membro.nome.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{m.membro.nome}</p>
-                      {m.membro.unidade && (
-                        <p className="text-xs text-muted truncate">{m.membro.unidade.nome}</p>
-                      )}
-                    </div>
-                    <span className="text-xs font-bold text-warning">{m.especialidades.length}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {m.especialidades.map(esp => (
-                      <span
-                        key={esp.id}
-                        className={`inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 ${
-                          esp.concluido
-                            ? 'bg-success/20 text-success'
-                            : 'bg-warning/20 text-warning'
-                        }`}
-                      >
-                        {esp.nome}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                <EspMembroRow key={m.membro.id} data={m} />
               ))}
           </div>
         ) : (

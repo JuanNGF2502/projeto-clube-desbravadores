@@ -140,7 +140,7 @@ export async function getEstatisticasEspecialidades(clubeId: string) {
 
 export interface MembroEspecialidadesResumo {
   membro: { id: string; nome: string; unidade?: { id: string; nome: string } };
-  especialidades: { id: string; nome: string; categoria: string; concluido: boolean; instrutor?: string; data_inicio?: string; data_conclusao?: string }[];
+  especialidades: { id: string; nome: string; categoria: string; concluido: boolean; instrutor?: string; descricao?: string; data_inicio?: string; data_conclusao?: string }[];
 }
 
 export async function getEspecialidadesPorMembros(clubeId: string): Promise<MembroEspecialidadesResumo[]> {
@@ -179,6 +179,7 @@ export async function getEspecialidadesPorMembros(clubeId: string): Promise<Memb
         categoria: a.especialidade.categoria,
         concluido: a.concluido,
         instrutor: a.instrutor,
+        descricao: a.descricao,
         data_inicio: a.data_inicio,
         data_conclusao: a.data_conclusao,
       });
