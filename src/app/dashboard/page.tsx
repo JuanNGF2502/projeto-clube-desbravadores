@@ -10,6 +10,7 @@ import { AppBadge } from '@/components/ui/AppBadge';
 import { AppModal } from '@/components/ui/AppModal';
 import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse, getAtividadeRecente } from '@/lib/queries';
 import { getMembrosComProgresso } from '@/lib/queries/classes';
+import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { formatDateBR } from '@/utils/date';
 import { DEFAULT_CLASSES } from '@/types';
 import { useClubId, useAuth } from '@/hooks';
@@ -60,6 +61,7 @@ function getTimelineColor(tipo: string) {
 export default function DashboardPage() {
   const clubId = useClubId();
   const { profile } = useAuth();
+  const { oculta } = usePontuacao();
   const [estatisticas, setEstatisticas] = useState({
     totalMembros: 0,
     membrosAtivos: 0,
@@ -200,7 +202,21 @@ export default function DashboardPage() {
                   Mês
                 </span>
               </div>
-              <p className="text-sm text-muted text-center py-4">Resultados em breve</p>
+              {oculta ? (
+                <p className="text-sm text-muted text-center py-4">Resultados em breve</p>
+              ) : (
+                <div className="space-y-2">
+                  {ranking.slice(0, 3).map((unit, index) => (
+                    <div key={unit.id} className="flex items-center gap-2 py-1">
+                      <span className="w-5 text-xs font-bold text-muted">#{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-text-primary truncate">{unit.nome}</p>
+                      </div>
+                      <span className="text-xs font-bold text-primary">{unit.totalPontos}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
 
