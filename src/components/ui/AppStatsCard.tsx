@@ -16,6 +16,7 @@ interface AppStatsCardProps {
   };
   color?: 'primary' | 'success' | 'danger' | 'warning' | 'info';
   className?: string;
+  onClick?: () => void;
 }
 
 export function AppStatsCard({
@@ -25,6 +26,7 @@ export function AppStatsCard({
   trend,
   color = 'primary',
   className,
+  onClick,
 }: AppStatsCardProps) {
   const colors = {
     primary: 'text-primary bg-primary/10',
@@ -44,7 +46,7 @@ export function AppStatsCard({
   const isNegative = trend && trend.value < 0;
 
   return (
-    <AppCard hover className={cn('group', className)}>
+    <AppCard hover className={cn('group', className)} onClick={onClick}>
       <div className="flex items-start justify-between">
         <div className="space-y-3">
           <p className="text-sm text-muted font-medium">{label}</p>

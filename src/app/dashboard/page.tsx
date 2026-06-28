@@ -9,6 +9,8 @@ import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { AppModal } from '@/components/ui/AppModal';
 import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse, getAtividadeRecente } from '@/lib/queries';
+import { getEspecialidadesPorMembros } from '@/lib/queries/especialidades';
+import type { MembroEspecialidadesResumo } from '@/lib/queries/especialidades';
 import { getMembrosComProgresso } from '@/lib/queries/classes';
 import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { formatDateBR } from '@/utils/date';
@@ -77,6 +79,9 @@ export default function DashboardPage() {
   const [classeModal, setClasseModal] = useState<{ id: string; nome: string; cor: string } | null>(null);
   const [membrosDaClasse, setMembrosDaClasse] = useState<MembroClasse[]>([]);
   const [loadingMembros, setLoadingMembros] = useState(false);
+  const [espModal, setEspModal] = useState(false);
+  const [membrosEsp, setMembrosEsp] = useState<MembroEspecialidadesResumo[]>([]);
+  const [loadingEsp, setLoadingEsp] = useState(false);
 
   useEffect(() => {
     if (!clubId) return;
@@ -114,6 +119,19 @@ export default function DashboardPage() {
       console.error('Erro ao carregar membros da classe:', err);
     } finally {
       setLoadingMembros(false);
+    }
+  };
+
+  const abrirEspecialidades = async () => {
+    setEspModal(true);
+    setLoadingEsp(true);
+    try {
+      const data = await getEspecialidadesPorMembros(clubId);
+      setMembrosEsp(data);
+    } catch (err) {
+      console.error('Erro ao carregar especialidades:', err);
+    } finally {
+      setLoadingEsp(false);
     }
   };
 
@@ -188,6 +206,8 @@ export default function DashboardPage() {
               value={estatisticas.totalEspecialidades}
               icon={Award}
               color="warning"
+              className="cursor-pointer"
+              onClick={abrirEspecialidades}
             />
           </div>
         </motion.div>
@@ -319,6 +339,58 @@ export default function DashboardPage() {
         ) : (
           <div className="text-center py-10 text-sm text-muted">
             Nenhum membro nesta classe
+          </div>
+        )}
+      </AppModal>
+
+      <AppModal
+        isOpen={espModal}
+        onClose={() => setEspModal(false)}
+        title="Especialidades por Membro"
+        size="md"
+      >
+        {loadingEsp ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : membrosEsp.length > 0 ? (
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            {membrosEsp
+              .filter(m => m.especialidades.length > 0)
+              .map(m => (
+                <div key={m.membro.id} className="p-3 rounded-xl bg-card/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 bg-primary">
+                      {m.membro.nome.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate">{m.membro.nome}</p>
+                      {m.membro.unidade && (
+                        <p className="text-xs text-muted truncate">{m.membro.unidade.nome}</p>
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-warning">{m.especialidades.length}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {m.especialidades.map(esp => (
+                      <span
+                        key={esp.id}
+                        className={`inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 ${
+                          esp.concluido
+                            ? 'bg-success/20 text-success'
+                            : 'bg-warning/20 text-warning'
+                        }`}
+                      >
+                        {esp.nome}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 text-sm text-muted">
+            Nenhuma especialidade atribuída
           </div>
         )}
       </AppModal>

@@ -137,3 +137,53 @@ export async function getEstatisticasEspecialidades(clubeId: string) {
     membrosComEspecialidade: membrosComEsp.size,
   };
 }
+
+export interface MembroEspecialidadesResumo {
+  membro: { id: string; nome: string; unidade?: { id: string; nome: string } };
+  especialidades: { id: string; nome: string; categoria: string; concluido: boolean; instrutor?: string; data_inicio?: string; data_conclusao?: string }[];
+}
+
+export async function getEspecialidadesPorMembros(clubeId: string): Promise<MembroEspecialidadesResumo[]> {
+  const { data: membros, error: errMembros } = await supabase
+    .from('membros')
+    .select('id, nome, unidade:unidades(id, nome)')
+    .eq('clube_id', clubeId)
+    .eq('ativo', true)
+    .order('nome');
+
+  if (errMembros) throw errMembros;
+  if (!membros) return [];
+
+  const membroIds = membros.map(m => m.id);
+
+  const { data: atribuicoes, error: errAttr } = await supabase
+    .from('membros_especialidades')
+    .select('*, especialidade:especialidades(*)')
+    .in('membro_id', membroIds)
+    .order('especialidade_id');
+
+  if (errAttr) throw errAttr;
+
+  const map = new Map<string, MembroEspecialidadesResumo>();
+  for (const m of membros) {
+    const unidade = Array.isArray(m.unidade) ? m.unidade[0] : m.unidade;
+    map.set(m.id, { membro: { id: m.id, nome: m.nome, unidade }, especialidades: [] });
+  }
+
+  for (const a of atribuicoes || []) {
+    const entry = map.get(a.membro_id);
+    if (entry && a.especialidade) {
+      entry.especialidades.push({
+        id: a.especialidade.id,
+        nome: a.especialidade.nome,
+        categoria: a.especialidade.categoria,
+        concluido: a.concluido,
+        instrutor: a.instrutor,
+        data_inicio: a.data_inicio,
+        data_conclusao: a.data_conclusao,
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
