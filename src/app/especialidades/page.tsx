@@ -15,7 +15,7 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase/client';
 import { SPECIALTY_CATEGORIES, type EspecialidadeCategoria } from '@/types';
 import { cn } from '@/utils/cn';
-import { getMembrosDisponiveis, getMembrosPorEspecialidade, atribuirEspecialidade, removerEspecialidade, updateProgressoEspecialidade } from '@/lib/queries/especialidades';
+import { getMembrosDisponiveis, getMembrosPorEspecialidade, atribuirEspecialidade, removerEspecialidade, updateProgressoEspecialidade, type AtribuirDados } from '@/lib/queries/especialidades';
 import { useClubId } from '@/hooks';
 
 interface Especialidade {
@@ -47,6 +47,7 @@ export default function EspecialidadesPage() {
   const [membrosDisponiveis, setMembrosDisponiveis] = useState<any[]>([]);
   const [membrosAtribuidos, setMembrosAtribuidos] = useState<any[]>([]);
   const [selectedMembroId, setSelectedMembroId] = useState('');
+  const [assignData, setAssignData] = useState({ data_inicio: new Date().toISOString().split('T')[0], instrutor: '', descricao: '' });
   const [assigning, setAssigning] = useState(false);
   const { addToast } = useToast();
 
@@ -156,6 +157,7 @@ export default function EspecialidadesPage() {
   const handleOpenAssign = async (esp: Especialidade) => {
     setAssignEsp(esp);
     setSelectedMembroId('');
+    setAssignData({ data_inicio: new Date().toISOString().split('T')[0], instrutor: '', descricao: '' });
     try {
       const [membros, atribuidos] = await Promise.all([
         getMembrosDisponiveis(CLUB_ID),
@@ -172,11 +174,16 @@ export default function EspecialidadesPage() {
 
   const handleAtribuir = async () => {
     if (!selectedMembroId || !assignEsp) return;
+    if (!assignData.instrutor.trim()) {
+      addToast({ type: 'error', title: 'Erro', message: 'Informe o instrutor' });
+      return;
+    }
     try {
       setAssigning(true);
-      await atribuirEspecialidade(selectedMembroId, assignEsp.id);
+      await atribuirEspecialidade(selectedMembroId, assignEsp.id, assignData);
       addToast({ type: 'success', title: 'Sucesso', message: 'Especialidade atribuída ao membro' });
       setSelectedMembroId('');
+      setAssignData({ data_inicio: new Date().toISOString().split('T')[0], instrutor: '', descricao: '' });
       const atribuidos = await getMembrosPorEspecialidade(assignEsp.id);
       setMembrosAtribuidos(atribuidos);
     } catch (error) {
@@ -360,30 +367,58 @@ export default function EspecialidadesPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-1 block">Selecionar Membro</label>
-            <div className="flex gap-2">
-              <select
-                value={selectedMembroId}
-                onChange={(e) => setSelectedMembroId(e.target.value)}
-                className="flex-1 p-3 rounded-xl border border-border bg-card text-text-primary"
-              >
-                <option value="">Selecione um membro...</option>
-                {membrosDisponiveis
-                  .filter(m => !membrosAtribuidos.some(a => a.membro_id === m.id))
-                  .map(m => (
-                    <option key={m.id} value={m.id}>{m.nome}</option>
-                  ))}
-              </select>
-              <AppButton
+            <label className="text-sm font-medium mb-1 block">Membro *</label>
+            <select
+              value={selectedMembroId}
+              onChange={(e) => setSelectedMembroId(e.target.value)}
+              className="w-full p-3 rounded-xl border border-border bg-card text-text-primary"
+            >
+              <option value="">Selecione um membro...</option>
+              {membrosDisponiveis
+                .filter(m => !membrosAtribuidos.some(a => a.membro_id === m.id))
+                .map(m => (
+                  <option key={m.id} value={m.id}>{m.nome}</option>
+                ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium mb-1 block">Data de Início</label>
+            <input
+              type="date"
+              value={assignData.data_inicio}
+              onChange={(e) => setAssignData({ ...assignData, data_inicio: e.target.value })}
+              className="w-full p-3 rounded-xl border border-border bg-card text-text-primary"
+            />
+          </div>
+
+          <AppInput
+            label="Instrutor *"
+            placeholder="Nome do instrutor"
+            value={assignData.instrutor}
+            onChange={(e) => setAssignData({ ...assignData, instrutor: e.target.value })}
+          />
+
+          <div>
+            <label className="text-sm font-medium mb-1 block">Descrição</label>
+            <textarea
+              placeholder="Observações sobre a atribuição..."
+              value={assignData.descricao}
+              onChange={(e) => setAssignData({ ...assignData, descricao: e.target.value })}
+              className="w-full p-3 rounded-xl border border-border bg-card text-text-primary text-sm min-h-[80px] resize-none"
+              rows={3}
+            />
+          </div>
+
+          <AppButton
                 onClick={handleAtribuir}
-                disabled={!selectedMembroId}
+                disabled={!selectedMembroId || !assignData.instrutor.trim()}
                 isLoading={assigning}
+                className="w-full"
               >
                 <UserPlus className="w-4 h-4 mr-1" />
                 Atribuir
               </AppButton>
-            </div>
-          </div>
 
           {membrosAtribuidos.length > 0 && (
             <div>
@@ -404,8 +439,14 @@ export default function EspecialidadesPage() {
                         <p className="text-sm font-medium text-text-primary">{ma.membro?.nome || 'Membro'}</p>
                         <p className="text-xs text-muted">
                           {ma.concluido ? '✓ Concluída' : 'Em andamento'}
-                          {ma.data_inicio && ` • Desde ${new Date(ma.data_inicio).toLocaleDateString('pt-BR')}`}
+                          {ma.data_inicio && ` • ${new Date(ma.data_inicio).toLocaleDateString('pt-BR')}`}
                         </p>
+                        {ma.instrutor && (
+                          <p className="text-xs text-muted">Instrutor: {ma.instrutor}</p>
+                        )}
+                        {ma.descricao && (
+                          <p className="text-xs text-muted mt-0.5 italic line-clamp-1">{ma.descricao}</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">

@@ -15,3 +15,7 @@ ALTER TABLE especialidades DROP CONSTRAINT IF EXISTS especialidades_categoria_ch
 
 -- 4. Remove coluna nivel (não será mais usada)
 ALTER TABLE especialidades DROP COLUMN IF EXISTS nivel;
+
+-- 5. Adiciona colunas instrutor e descricao em membros_especialidades
+ALTER TABLE membros_especialidades ADD COLUMN IF NOT EXISTS instrutor TEXT;
+ALTER TABLE membros_especialidades ADD COLUMN IF NOT EXISTS descricao TEXT;

@@ -1,5 +1,11 @@
 import { supabase } from '@/lib/supabase/client';
 
+export interface AtribuirDados {
+  data_inicio: string;
+  instrutor: string;
+  descricao: string;
+}
+
 export interface MembroEspecialidade {
   id: string;
   membro_id: string;
@@ -7,11 +13,12 @@ export interface MembroEspecialidade {
   data_inicio?: string;
   data_conclusao?: string;
   concluido: boolean;
+  instrutor?: string;
+  descricao?: string;
   especialidade?: {
     id: string;
     nome: string;
     categoria: string;
-    nivel: number;
   };
   membro?: {
     id: string;
@@ -44,14 +51,17 @@ export async function getMembrosPorEspecialidade(especialidadeId: string): Promi
 
 export async function atribuirEspecialidade(
   membroId: string,
-  especialidadeId: string
+  especialidadeId: string,
+  dados: AtribuirDados
 ): Promise<MembroEspecialidade> {
   const { data, error } = await supabase
     .from('membros_especialidades')
     .insert({
       membro_id: membroId,
       especialidade_id: especialidadeId,
-      data_inicio: new Date().toISOString().split('T')[0],
+      data_inicio: dados.data_inicio || new Date().toISOString().split('T')[0],
+      instrutor: dados.instrutor || null,
+      descricao: dados.descricao || null,
       concluido: false,
     })
     .select()
