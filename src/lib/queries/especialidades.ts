@@ -98,6 +98,27 @@ export async function updateProgressoEspecialidade(
   if (error) throw error;
 }
 
+export async function updateAtribuicao(
+  membroId: string,
+  especialidadeId: string,
+  dados: Partial<{ data_inicio: string; instrutor: string; descricao: string }>
+): Promise<void> {
+  const updateData: Record<string, any> = {};
+  if (dados.data_inicio !== undefined) updateData.data_inicio = dados.data_inicio;
+  if (dados.instrutor !== undefined) updateData.instrutor = dados.instrutor;
+  if (dados.descricao !== undefined) updateData.descricao = dados.descricao;
+
+  if (Object.keys(updateData).length === 0) return;
+
+  const { error } = await supabase
+    .from('membros_especialidades')
+    .update(updateData)
+    .eq('membro_id', membroId)
+    .eq('especialidade_id', especialidadeId);
+
+  if (error) throw error;
+}
+
 export async function getMembrosDisponiveis(clubeId: string) {
   const { data, error } = await supabase
     .from('membros')
@@ -108,6 +129,15 @@ export async function getMembrosDisponiveis(clubeId: string) {
 
   if (error) throw error;
   return data || [];
+}
+
+export async function toggleEspecialidadeAtivo(id: string, ativo: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('especialidades')
+    .update({ ativo })
+    .eq('id', id);
+
+  if (error) throw error;
 }
 
 export async function getEstatisticasEspecialidades(clubeId: string) {

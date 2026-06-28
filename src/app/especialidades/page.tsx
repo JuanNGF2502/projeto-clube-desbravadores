@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, Pencil, Trash2, Award, Loader2, Save, UserPlus, X, Check, Users, RotateCcw } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Award, Loader2, Save, UserPlus, X, Check, Users, RotateCcw, Eye, EyeOff, Edit2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -15,7 +15,7 @@ import { useToast } from '@/components/ui/Toast';
 import { supabase } from '@/lib/supabase/client';
 import { SPECIALTY_CATEGORIES, type EspecialidadeCategoria } from '@/types';
 import { cn } from '@/utils/cn';
-import { getMembrosDisponiveis, getMembrosPorEspecialidade, atribuirEspecialidade, removerEspecialidade, updateProgressoEspecialidade, type AtribuirDados } from '@/lib/queries/especialidades';
+import { getMembrosDisponiveis, getMembrosPorEspecialidade, atribuirEspecialidade, removerEspecialidade, updateProgressoEspecialidade, updateAtribuicao, toggleEspecialidadeAtivo, type AtribuirDados } from '@/lib/queries/especialidades';
 import { useClubId } from '@/hooks';
 
 interface Especialidade {
@@ -49,6 +49,10 @@ export default function EspecialidadesPage() {
   const [selectedMembroId, setSelectedMembroId] = useState('');
   const [assignData, setAssignData] = useState({ data_inicio: new Date().toISOString().split('T')[0], instrutor: '', descricao: '' });
   const [assigning, setAssigning] = useState(false);
+  // Editar atribuição
+  const [editingAtribuicao, setEditingAtribuicao] = useState<{ membroId: string; membroNome: string } | null>(null);
+  const [editAtribForm, setEditAtribForm] = useState({ data_inicio: '', instrutor: '', descricao: '' });
+  const [savingEditAtrib, setSavingEditAtrib] = useState(false);
   const { addToast } = useToast();
 
   const carregarDados = async () => {
@@ -154,6 +158,17 @@ export default function EspecialidadesPage() {
     }
   };
 
+  const handleToggleAtivo = async (esp: Especialidade) => {
+    try {
+      await toggleEspecialidadeAtivo(esp.id, !esp.ativo);
+      addToast({ type: 'success', title: esp.ativo ? 'Desativada' : 'Ativada', message: `"${esp.nome}" ${esp.ativo ? 'desativada' : 'ativada'}` });
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao alterar status' });
+    }
+  };
+
   const handleOpenAssign = async (esp: Especialidade) => {
     setAssignEsp(esp);
     setSelectedMembroId('');
@@ -191,6 +206,32 @@ export default function EspecialidadesPage() {
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao atribuir especialidade' });
     } finally {
       setAssigning(false);
+    }
+  };
+
+  const handleEditAtribuicao = (ma: any) => {
+    setEditingAtribuicao({ membroId: ma.membro_id, membroNome: ma.membro?.nome || 'Membro' });
+    setEditAtribForm({
+      data_inicio: ma.data_inicio?.split('T')[0] || '',
+      instrutor: ma.instrutor || '',
+      descricao: ma.descricao || '',
+    });
+  };
+
+  const handleSaveEditAtribuicao = async () => {
+    if (!editingAtribuicao || !assignEsp) return;
+    try {
+      setSavingEditAtrib(true);
+      await updateAtribuicao(editingAtribuicao.membroId, assignEsp.id, editAtribForm);
+      addToast({ type: 'success', title: 'Atualizado', message: 'Atribuição atualizada' });
+      setEditingAtribuicao(null);
+      const atribuidos = await getMembrosPorEspecialidade(assignEsp.id);
+      setMembrosAtribuidos(atribuidos);
+    } catch (error) {
+      console.error('Erro ao editar atribuição:', error);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao editar atribuição' });
+    } finally {
+      setSavingEditAtrib(false);
     }
   };
 
@@ -280,33 +321,39 @@ export default function EspecialidadesPage() {
                 transition={{ delay: index * 0.03 }}
               >
                 <AppCard hover className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                      <Award className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-text-primary">{esp.nome}</h4>
-                        <AppBadge size="sm" variant="primary">
-                          {esp.categoria}
-                        </AppBadge>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                        <Award className={`w-5 h-5 ${esp.ativo ? 'text-primary' : 'text-muted'}`} />
                       </div>
-                      {esp.descricao && (
-                        <p className="text-xs text-muted mt-1 line-clamp-1">{esp.descricao}</p>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className={`font-medium ${esp.ativo ? 'text-text-primary' : 'text-muted line-through'}`}>{esp.nome}</h4>
+                          <AppBadge size="sm" variant="primary">
+                            {esp.categoria}
+                          </AppBadge>
+                          {!esp.ativo && (
+                            <AppBadge size="sm" variant="secondary">Inativa</AppBadge>
+                          )}
+                        </div>
+                        {esp.descricao && (
+                          <p className="text-xs text-muted mt-1 line-clamp-1">{esp.descricao}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <AppButton variant="ghost" size="sm" onClick={() => handleOpenAssign(esp)} title="Atribuir a membro">
+                          <UserPlus className="w-4 h-4 text-primary" />
+                        </AppButton>
+                        <AppButton variant="ghost" size="sm" onClick={() => handleToggleAtivo(esp)} title={esp.ativo ? 'Desativar' : 'Ativar'}>
+                          {esp.ativo ? <EyeOff className="w-4 h-4 text-muted" /> : <Eye className="w-4 h-4 text-success" />}
+                        </AppButton>
+                        <AppButton variant="ghost" size="sm" onClick={() => handleOpenModal(esp)}>
+                          <Pencil className="w-4 h-4" />
+                        </AppButton>
+                        <AppButton variant="ghost" size="sm" onClick={() => handleDelete(esp)}>
+                          <Trash2 className="w-4 h-4 text-danger" />
+                        </AppButton>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <AppButton variant="ghost" size="sm" onClick={() => handleOpenAssign(esp)} title="Atribuir a membro">
-                        <UserPlus className="w-4 h-4 text-primary" />
-                      </AppButton>
-                      <AppButton variant="ghost" size="sm" onClick={() => handleOpenModal(esp)}>
-                        <Pencil className="w-4 h-4" />
-                      </AppButton>
-                      <AppButton variant="ghost" size="sm" onClick={() => handleDelete(esp)}>
-                        <Trash2 className="w-4 h-4 text-danger" />
-                      </AppButton>
-                    </div>
-                  </div>
                 </AppCard>
               </motion.div>
             ))}
@@ -420,6 +467,47 @@ export default function EspecialidadesPage() {
                 Atribuir
               </AppButton>
 
+          {/* Editar atribuição inline */}
+          {editingAtribuicao && (
+            <div className="p-3 rounded-xl bg-card border border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium">Editando: {editingAtribuicao.membroNome}</h4>
+                <AppButton variant="ghost" size="sm" onClick={() => setEditingAtribuicao(null)}>
+                  <X className="w-4 h-4" />
+                </AppButton>
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block">Data de Início</label>
+                <input
+                  type="date"
+                  value={editAtribForm.data_inicio}
+                  onChange={(e) => setEditAtribForm({ ...editAtribForm, data_inicio: e.target.value })}
+                  className="w-full p-2 rounded-lg border border-border bg-surface text-text-primary text-sm"
+                />
+              </div>
+              <AppInput
+                label="Instrutor"
+                placeholder="Nome do instrutor"
+                value={editAtribForm.instrutor}
+                onChange={(e) => setEditAtribForm({ ...editAtribForm, instrutor: e.target.value })}
+              />
+              <div>
+                <label className="text-xs font-medium mb-1 block">Descrição</label>
+                <textarea
+                  placeholder="Observações..."
+                  value={editAtribForm.descricao}
+                  onChange={(e) => setEditAtribForm({ ...editAtribForm, descricao: e.target.value })}
+                  className="w-full p-2 rounded-lg border border-border bg-surface text-text-primary text-sm min-h-[60px] resize-none"
+                  rows={2}
+                />
+              </div>
+              <AppButton onClick={handleSaveEditAtribuicao} isLoading={savingEditAtrib} size="sm" className="w-full">
+                <Save className="w-3 h-3 mr-1" />
+                Salvar alterações
+              </AppButton>
+            </div>
+          )}
+
           {membrosAtribuidos.length > 0 && (
             <div>
               <h4 className="text-sm font-medium mb-2">
@@ -450,6 +538,14 @@ export default function EspecialidadesPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <AppButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditAtribuicao(ma)}
+                        title="Editar atribuição"
+                      >
+                        <Edit2 className="w-4 h-4 text-info" />
+                      </AppButton>
                       <AppButton
                         variant="ghost"
                         size="sm"
@@ -486,7 +582,7 @@ export default function EspecialidadesPage() {
             </div>
           )}
 
-          {membrosAtribuidos.length === 0 && (
+          {membrosAtribuidos.length === 0 && !editingAtribuicao && (
             <p className="text-sm text-muted text-center py-4">
               Nenhum membro atribuído a esta especialidade ainda
             </p>
