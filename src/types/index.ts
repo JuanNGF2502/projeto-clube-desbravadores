@@ -406,22 +406,30 @@ export interface Especialidade {
 }
 
 export type EspecialidadeCategoria =
-  | 'ARTE manual'
-  | 'NATUREZA'
-  | 'SAÚDE'
-  | 'MISSIONÁRIA'
-  | 'PROFISSIONAL'
-  | 'DOMÉSTICA'
-  | 'RECREATIVA';
+  | 'Adra'
+  | 'Artes e Habilidades Manuais'
+  | 'Atividades Agrícolas'
+  | 'Atividades Recreativas'
+  | 'Atividades Profissionais'
+  | 'Atividades Missionárias e Comunitárias'
+  | 'Ensinos Bíblicos'
+  | 'Ciência e Saúde'
+  | 'Estudos da Natureza'
+  | 'Habilidades Domésticas'
+  | 'Mestrados';
 
 export const SPECIALTY_CATEGORIES: EspecialidadeCategoria[] = [
-  'ARTE manual',
-  'NATUREZA',
-  'SAÚDE',
-  'MISSIONÁRIA',
-  'PROFISSIONAL',
-  'DOMÉSTICA',
-  'RECREATIVA',
+  'Adra',
+  'Artes e Habilidades Manuais',
+  'Atividades Agrícolas',
+  'Atividades Recreativas',
+  'Atividades Profissionais',
+  'Atividades Missionárias e Comunitárias',
+  'Ensinos Bíblicos',
+  'Ciência e Saúde',
+  'Estudos da Natureza',
+  'Habilidades Domésticas',
+  'Mestrados',
 ];
 
 // ==========================================
