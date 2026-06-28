@@ -10,6 +10,7 @@ import { AppBadge } from '@/components/ui/AppBadge';
 import { AppModal } from '@/components/ui/AppModal';
 import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse, getAtividadeRecente } from '@/lib/queries';
 import { getMembrosComProgresso } from '@/lib/queries/classes';
+import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { formatDateBR } from '@/utils/date';
 import { DEFAULT_CLASSES } from '@/types';
 import { useClubId, useAuth } from '@/hooks';
@@ -60,6 +61,7 @@ function getTimelineColor(tipo: string) {
 export default function DashboardPage() {
   const clubId = useClubId();
   const { profile } = useAuth();
+  const { oculta } = usePontuacao();
   const [estatisticas, setEstatisticas] = useState({
     totalMembros: 0,
     membrosAtivos: 0,
@@ -208,7 +210,7 @@ export default function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-text-primary truncate">{unit.nome}</p>
                       </div>
-                      <span className="text-xs font-bold text-primary">{unit.totalPontos}</span>
+                      <span className="text-xs font-bold text-primary">{oculta ? '—' : unit.totalPontos}</span>
                     </div>
                   ))}
                 </div>

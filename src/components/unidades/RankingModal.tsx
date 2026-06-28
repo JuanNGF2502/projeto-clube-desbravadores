@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Trophy, Medal, Star, Users, Calendar, Loader2 } from 'lucide-react';
+import { Trophy, Medal, Star, Users, Calendar, Loader2, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppModal } from '@/components/ui/AppModal';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppBadge } from '@/components/ui/AppBadge';
 import { useToast } from '@/components/ui/Toast';
+import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { cn } from '@/utils/cn';
 import { formatDateBR } from '@/utils/date';
 import {
@@ -58,6 +59,7 @@ export function RankingModal({
   const [rankingData, setRankingData] = useState<RankingMembroData[]>([]);
   const [estatisticas, setEstatisticas] = useState<EstatisticasUnidade | null>(null);
   const [ultimaAvaliacao, setUltimaAvaliacao] = useState<string | null>(null);
+  const { oculta } = usePontuacao();
   const { addToast } = useToast();
 
   // Carregar dados do ranking quando o modal abre
@@ -184,7 +186,9 @@ export function RankingModal({
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin mx-auto text-primary" />
           ) : (
-            <p className="text-lg font-bold text-primary leading-none">{totalUnidade}</p>
+            <p className="text-lg font-bold text-primary leading-none">
+              {oculta ? '—' : totalUnidade}
+            </p>
           )}
           <p className="text-[10px] text-muted mt-0.5">pts</p>
         </div>
@@ -193,9 +197,17 @@ export function RankingModal({
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin mx-auto text-success" />
           ) : (
-            <p className="text-lg font-bold text-success leading-none">{mediaUnidade}</p>
+            <p className="text-lg font-bold text-success leading-none">
+              {oculta ? '—' : mediaUnidade}
+            </p>
           )}
-          <p className="text-[10px] text-muted mt-0.5">pts</p>
+          {oculta ? (
+            <p className="text-[10px] text-muted mt-0.5 flex items-center justify-center gap-1">
+              <EyeOff className="w-3 h-3" /> oculto
+            </p>
+          ) : (
+            <p className="text-[10px] text-muted mt-0.5">pts</p>
+          )}
         </div>
         <div className="rounded-xl bg-card border border-border p-3 text-center">
           <p className="text-[10px] text-muted uppercase tracking-wider font-medium mb-1">Última</p>
@@ -299,8 +311,12 @@ export function RankingModal({
 
                     {/* Pontos */}
                     <div className="text-right flex-shrink-0">
-                      <p className="text-xl font-bold text-text-primary leading-none">{membro.totalPontos}</p>
-                      <p className="text-[10px] text-muted mt-0.5">pts</p>
+                      <p className="text-xl font-bold text-text-primary leading-none">
+                        {oculta ? '—' : membro.totalPontos}
+                      </p>
+                      <p className="text-[10px] text-muted mt-0.5">
+                        {oculta ? '' : 'pts'}
+                      </p>
                     </div>
                   </AppCard>
                 </motion.div>

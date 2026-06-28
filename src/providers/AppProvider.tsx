@@ -6,6 +6,7 @@ import { ThemeProvider } from './ThemeProvider';
 import { QueryProvider } from './QueryProvider';
 import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider } from '@/hooks';
+import { PontuacaoProvider } from '@/contexts/PontuacaoContext';
 
 interface Props {
   children: ReactNode;
@@ -17,7 +18,9 @@ export function AppProvider({ children }: Props) {
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
-            {children}
+            <PontuacaoProvider>
+              {children}
+            </PontuacaoProvider>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import { getUnidadeById, getMembrosPorUnidade } from '@/lib/queries';
 import { getCriteriosAvaliacao, criarAvaliacoesBatch, getAvaliacoesPorUnidadeData, CriterioAvaliacaoDB } from '@/lib/queries/avaliacoes';
 import { getSessaoAtiva } from '@/lib/queries/sessoes-avaliacao';
+import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { formatDateBR } from '@/utils/date';
 
 interface Membro {
@@ -41,6 +42,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const { oculta: pontuacaoOculta } = usePontuacao();
   const [unidade, setUnidade] = useState<any>(null);
   const [membros, setMembros] = useState<Membro[]>([]);
   const [criterios, setCriterios] = useState<CriterioAvaliacaoDB[]>([]);
@@ -383,8 +385,8 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
         <div className="grid grid-cols-3 gap-3">
           <AppCard className="text-center">
             <Trophy className="w-5 h-5 text-primary mx-auto mb-1" />
-            <p className="text-lg font-bold text-text-primary">{totalGeral}</p>
-            <p className="text-xs text-muted">Pontos Totais</p>
+            <p className="text-lg font-bold text-text-primary">{pontuacaoOculta ? '—' : totalGeral}</p>
+            <p className="text-xs text-muted">{pontuacaoOculta ? 'Oculto' : 'Pontos Totais'}</p>
           </AppCard>
           <AppCard className="text-center">
             <Users className="w-5 h-5 text-success mx-auto mb-1" />
@@ -393,8 +395,8 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
           </AppCard>
           <AppCard className="text-center">
             <Calendar className="w-5 h-5 text-warning mx-auto mb-1" />
-            <p className="text-lg font-bold text-text-primary">{mediaGeral}</p>
-            <p className="text-xs text-muted">Média</p>
+            <p className="text-lg font-bold text-text-primary">{pontuacaoOculta ? '—' : mediaGeral}</p>
+            <p className="text-xs text-muted">{pontuacaoOculta ? 'Oculto' : 'Média'}</p>
           </AppCard>
         </div>
 
@@ -464,8 +466,8 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
                             <AppBadge variant="warning" size="sm">Ausente</AppBadge>
                           )}
                           <div className="text-right">
-                            <p className="text-lg font-bold text-text-primary">{totalMembro}</p>
-                            <p className="text-xs text-muted">pontos</p>
+                            <p className="text-lg font-bold text-text-primary">{pontuacaoOculta ? '—' : totalMembro}</p>
+                            <p className="text-xs text-muted">{pontuacaoOculta ? '' : 'pontos'}</p>
                           </div>
                           {isExpanded ? (
                             <ChevronUp className="w-5 h-5 text-muted" />
@@ -532,7 +534,7 @@ export default function AvaliacoesPage({ params }: { params: Promise<Params> }) 
                                 </div>
                                 <div className="text-right w-16">
                                   <p className="text-lg font-bold text-text-primary">
-                                    {avaliacao?.pontos || 0}
+                                    {pontuacaoOculta ? '—' : (avaliacao?.pontos || 0)}
                                   </p>
                                 </div>
                               </div>

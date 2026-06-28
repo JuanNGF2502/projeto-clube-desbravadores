@@ -18,6 +18,7 @@ import { Unit, UNIT_GENDERS, DEFAULT_UNIT_COLORS } from '@/types';
 import { cn } from '@/utils/cn';
 import { getUnidadesByClube, createUnidade, updateUnidade, getRankingUnidades } from '@/lib/queries';
 import { useClubId, useAuth } from '@/hooks';
+import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { getUnidadesQueConselheiroOrienta } from '@/lib/queries/membros';
 
 interface FormData {
@@ -33,6 +34,7 @@ interface FormData {
 export default function UnitsPage() {
   const CLUB_ID = useClubId();
   const { user, profile } = useAuth();
+  const { oculta } = usePontuacao();
   const [units, setUnits] = useState<Unit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -299,10 +301,10 @@ export default function UnitsPage() {
                         {unit.membrosCount || 0} membros
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-lg font-bold text-primary">{rankingData[unit.id] || 0}</p>
-                        <p className="text-xs text-muted">pontos</p>
+                        <p className="text-lg font-bold text-primary">{oculta ? '—' : (rankingData[unit.id] || 0)}</p>
+                        <p className="text-xs text-muted">{oculta ? '' : 'pontos'}</p>
                       </div>
                       <svg className="w-5 h-5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

@@ -19,6 +19,7 @@ import { getClasseById } from '@/lib/queries/classes';
 import { getEstatisticasUnidade, getAtividadeRecente, CriterioSoma } from '@/lib/queries/dashboard';
 import { DEFAULT_CLASSES } from '@/types';
 import { useClubId, useAuth } from '@/hooks';
+import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { getSessaoAtiva } from '@/lib/queries/sessoes-avaliacao';
 
 interface Tab {
@@ -41,7 +42,8 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
   const resolvedParams = use(params);
   const router = useRouter();
   const { addToast } = useToast();
-  const { isAdmin, profile } = useAuth();
+  const { profile } = useAuth();
+  const { oculta: pontuacaoOculta } = usePontuacao();
 
   const [isLoading, setIsLoading] = useState(true);
   const [unidade, setUnidade] = useState<any>(null);
@@ -52,7 +54,6 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
   const [estatisticasUnidade, setEstatisticasUnidade] = useState<any>(null);
   const [atividadesRecentes, setAtividadesRecentes] = useState<any[]>([]);
   const [sessaoAtiva, setSessaoAtiva] = useState<any>(null);
-
   const carregarDados = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -208,8 +209,8 @@ export default function UnitDetailPage({ params }: { params: Promise<Params> }) 
                 color="primary"
               />
               <AppStatsCard
-                label="Total Pontos"
-                value={totalScore}
+                label={pontuacaoOculta ? 'Pontuação' : 'Total Pontos'}
+                value={pontuacaoOculta ? '—' : totalScore}
                 icon={Trophy}
                 color="success"
               />

@@ -59,3 +59,6 @@ export * from './especialidades';
 
 // Sessões de Avaliação
 export * from './sessoes-avaliacao';
+
+// Configuração
+export { getPontuacaoOculta, setPontuacaoOculta } from './configuracao';

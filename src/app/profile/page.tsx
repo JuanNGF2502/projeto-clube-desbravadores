@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog, BookOpen, Mail, Award, KeyRound, Check, X, ClipboardCheck, Play, Square, Clock, Calendar } from "lucide-react";
+import { User, Settings, LogOut, ShieldCheck, Sun, Moon, Plus, Pencil, Trash2, Users, UserPlus, ChevronRight, User2Icon, UserCog, BookOpen, Mail, Award, KeyRound, Check, X, ClipboardCheck, Play, Square, Clock, Calendar, Eye, EyeOff } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AppCard } from "@/components/ui/AppCard";
 import { AppButton } from "@/components/ui/AppButton";
@@ -21,6 +21,7 @@ import { getTodasUnidades, createUnidade, updateUnidade, deleteUnidade } from '@
 import { getEspecialidadesMembro } from '@/lib/queries/especialidades';
 import { getSessoesPorUnidade, criarSessao, ativarSessao, updateSessao, deleteSessao, SessaoAvaliacao } from '@/lib/queries/sessoes-avaliacao';
 import { useClubId } from '@/hooks';
+import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { formatDateBR, toLocalDateString } from '@/utils/date';
 
 export default function ProfilePage() {
@@ -51,6 +52,7 @@ export default function ProfilePage() {
   });
 
   // Avaliação session management state
+  const { oculta: pontuacaoOculta, toggle: togglePontuacao } = usePontuacao();
   const [showSessaoModal, setShowSessaoModal] = useState(false);
   const [sessoesPorUnidade, setSessoesPorUnidade] = useState<Record<string, SessaoAvaliacao[]>>({});
   const [batchDate, setBatchDate] = useState(toLocalDateString());
@@ -437,6 +439,41 @@ export default function ProfilePage() {
             </AppButton>
           </div>
           <p className="text-xs text-muted -mt-2">A data será aplicada a todas as unidades</p>
+
+          {/* Toggle de pontuação */}
+          <button
+            onClick={togglePontuacao}
+            className="w-full flex items-center justify-between p-3 rounded-xl border border-border bg-surface/50 hover:bg-surface transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-surface">
+                {pontuacaoOculta ? (
+                  <EyeOff className="w-5 h-5 text-warning" />
+                ) : (
+                  <Eye className="w-5 h-5 text-primary" />
+                )}
+              </div>
+              <div className="text-left">
+                <p className="font-medium text-sm text-text-primary">Ocultar pontuação</p>
+                <p className="text-xs text-muted">Para todas as unidades do clube</p>
+              </div>
+            </div>
+            <div className={cn(
+              'relative w-14 h-8 rounded-full p-1 transition-colors duration-300',
+              pontuacaoOculta ? 'bg-warning' : 'bg-surface'
+            )}>
+              <div
+                className={cn(
+                  'w-6 h-6 rounded-full shadow-md transition-transform duration-300 bg-white',
+                  pontuacaoOculta ? 'translate-x-6' : 'translate-x-0'
+                )}
+              />
+            </div>
+          </button>
+
+          <div className="border-t border-border pt-4">
+            <h4 className="text-sm font-semibold text-text-primary mb-3">Sessões por Unidade</h4>
+          </div>
 
           {units.length === 0 ? (
             <p className="text-sm text-muted text-center py-4">Nenhuma unidade encontrada</p>

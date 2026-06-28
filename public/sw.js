@@ -1,6 +1,6 @@
-const CACHE_NAME = 'desbravadores-v3';
-const STATIC_CACHE = 'desbravadores-static-v2';
-const API_CACHE = 'desbravadores-api-v2';
+const CACHE_NAME = 'desbravadores-v4';
+const STATIC_CACHE = 'desbravadores-static-v3';
+const API_CACHE = 'desbravadores-api-v3';
 const OFFLINE_URL = '/offline';
 
 self.addEventListener('install', (event) => {
