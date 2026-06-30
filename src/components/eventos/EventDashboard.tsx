@@ -106,10 +106,22 @@ export function EventDashboard() {
     setSaving(true);
     try {
       if (editingEvento) {
-        await atualizarEvento(editingEvento.id, form);
+        await atualizarEvento(editingEvento.id, {
+          ...form,
+          descricao: form.descricao || undefined,
+          data_fim: form.data_fim || undefined,
+          local: form.local || undefined,
+        });
         addToast({ type: 'success', title: 'Atualizado', message: 'Evento atualizado' });
       } else {
-        await criarEvento({ ...form, clube_id: clubId });
+        await criarEvento({
+          clube_id: clubId,
+          titulo: form.titulo,
+          data_evento: form.data_evento,
+          descricao: form.descricao || undefined,
+          data_fim: form.data_fim || undefined,
+          local: form.local || undefined,
+        });
         addToast({ type: 'success', title: 'Criado', message: 'Evento criado' });
       }
       setFormModalOpen(false);
