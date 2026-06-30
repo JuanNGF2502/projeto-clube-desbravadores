@@ -30,14 +30,21 @@ ALTER TABLE eventos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE eventos_fotos ENABLE ROW LEVEL SECURITY;
 
 -- Policies eventos
+DROP POLICY IF EXISTS "eventos_select" ON eventos;
 CREATE POLICY "eventos_select" ON eventos FOR SELECT USING (true);
+DROP POLICY IF EXISTS "eventos_insert" ON eventos;
 CREATE POLICY "eventos_insert" ON eventos FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "eventos_update" ON eventos;
 CREATE POLICY "eventos_update" ON eventos FOR UPDATE USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "eventos_delete" ON eventos;
 CREATE POLICY "eventos_delete" ON eventos FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Policies eventos_fotos
+DROP POLICY IF EXISTS "eventos_fotos_select" ON eventos_fotos;
 CREATE POLICY "eventos_fotos_select" ON eventos_fotos FOR SELECT USING (true);
+DROP POLICY IF EXISTS "eventos_fotos_insert" ON eventos_fotos;
 CREATE POLICY "eventos_fotos_insert" ON eventos_fotos FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "eventos_fotos_delete" ON eventos_fotos;
 CREATE POLICY "eventos_fotos_delete" ON eventos_fotos FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Storage bucket para fotos
@@ -46,12 +53,15 @@ SELECT 'eventos', 'eventos', true
 WHERE NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'eventos');
 
 -- Policy: permitir upload no bucket eventos
+DROP POLICY IF EXISTS "eventos_upload" ON storage.objects;
 CREATE POLICY "eventos_upload" ON storage.objects FOR INSERT WITH CHECK (
   bucket_id = 'eventos' AND auth.role() = 'authenticated'
 );
+DROP POLICY IF EXISTS "eventos_select_obj" ON storage.objects;
 CREATE POLICY "eventos_select_obj" ON storage.objects FOR SELECT USING (
   bucket_id = 'eventos'
 );
+DROP POLICY IF EXISTS "eventos_delete_obj" ON storage.objects;
 CREATE POLICY "eventos_delete_obj" ON storage.objects FOR DELETE USING (
   bucket_id = 'eventos' AND auth.role() = 'authenticated'
 );
