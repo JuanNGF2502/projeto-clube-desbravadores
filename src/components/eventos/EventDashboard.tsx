@@ -50,8 +50,9 @@ export function EventDashboard() {
     try {
       const data = await getEventos(clubId, mesAtual, anoAtual);
       setEventos(data);
-    } catch {
-      addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar eventos' });
+    } catch (err) {
+      console.error('Erro ao carregar eventos:', err);
+      addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar eventos. Execute a migration 20260701_eventos.sql no Supabase.' });
     } finally {
       setLoading(false);
     }

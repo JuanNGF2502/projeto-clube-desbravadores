@@ -40,7 +40,10 @@ export async function getEventos(clubeId: string, mes?: number, ano?: number): P
 
   const { data, error } = await query;
 
-  if (error) throw error;
+  if (error) {
+    console.error('getEventos error:', JSON.stringify(error, null, 2));
+    throw error;
+  }
   return data || [];
 }
 
