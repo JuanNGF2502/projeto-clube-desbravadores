@@ -39,3 +39,19 @@ CREATE POLICY "eventos_delete" ON eventos FOR DELETE USING (auth.role() = 'authe
 CREATE POLICY "eventos_fotos_select" ON eventos_fotos FOR SELECT USING (true);
 CREATE POLICY "eventos_fotos_insert" ON eventos_fotos FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "eventos_fotos_delete" ON eventos_fotos FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Storage bucket para fotos
+INSERT INTO storage.buckets (id, name, public)
+SELECT 'eventos', 'eventos', true
+WHERE NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'eventos');
+
+-- Policy: permitir upload no bucket eventos
+CREATE POLICY "eventos_upload" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'eventos' AND auth.role() = 'authenticated'
+);
+CREATE POLICY "eventos_select_obj" ON storage.objects FOR SELECT USING (
+  bucket_id = 'eventos'
+);
+CREATE POLICY "eventos_delete_obj" ON storage.objects FOR DELETE USING (
+  bucket_id = 'eventos' AND auth.role() = 'authenticated'
+);

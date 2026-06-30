@@ -56,7 +56,10 @@ export async function getEventosRecentes(clubeId: string, limite = 3): Promise<E
     .order('data_evento', { ascending: true })
     .limit(limite);
 
-  if (error) throw error;
+  if (error) {
+    console.error('getEventosRecentes error:', JSON.stringify(error));
+    throw error;
+  }
   return data || [];
 }
 
@@ -67,7 +70,10 @@ export async function getEventoById(eventoId: string): Promise<Evento | null> {
     .eq('id', eventoId)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('getEventoById error:', JSON.stringify(error));
+    throw error;
+  }
   return data;
 }
 
@@ -85,7 +91,10 @@ export async function criarEvento(evento: {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('criarEvento error:', JSON.stringify(error));
+    throw error;
+  }
   return data;
 }
 
@@ -107,7 +116,10 @@ export async function atualizarEvento(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('atualizarEvento error:', JSON.stringify(error));
+    throw error;
+  }
   return data;
 }
 
@@ -117,7 +129,10 @@ export async function deletarEvento(id: string): Promise<void> {
     .delete()
     .eq('id', id);
 
-  if (error) throw error;
+  if (error) {
+    console.error('deletarEvento error:', JSON.stringify(error));
+    throw error;
+  }
 }
 
 export async function uploadFotoEvento(eventoId: string, file: File): Promise<string> {
@@ -128,7 +143,10 @@ export async function uploadFotoEvento(eventoId: string, file: File): Promise<st
     .from('eventos')
     .upload(filePath, file);
 
-  if (uploadError) throw uploadError;
+  if (uploadError) {
+    console.error('uploadFotoEvento storage error:', JSON.stringify(uploadError));
+    throw uploadError;
+  }
 
   const { data: urlData } = supabase.storage
     .from('eventos')
@@ -140,7 +158,10 @@ export async function uploadFotoEvento(eventoId: string, file: File): Promise<st
     .from('eventos_fotos')
     .insert({ evento_id: eventoId, url });
 
-  if (dbError) throw dbError;
+  if (dbError) {
+    console.error('uploadFotoEvento db error:', JSON.stringify(dbError));
+    throw dbError;
+  }
 
   return url;
 }
@@ -148,12 +169,16 @@ export async function uploadFotoEvento(eventoId: string, file: File): Promise<st
 export async function deletarFoto(fotoId: string, url: string): Promise<void> {
   const filePath = url.split('/').slice(-2).join('/');
 
-  await supabase.storage.from('eventos').remove([filePath]);
+  const { error: removeError } = await supabase.storage.from('eventos').remove([filePath]);
+  if (removeError) console.error('deletarFoto storage error:', JSON.stringify(removeError));
 
   const { error } = await supabase
     .from('eventos_fotos')
     .delete()
     .eq('id', fotoId);
 
-  if (error) throw error;
+  if (error) {
+    console.error('deletarFoto db error:', JSON.stringify(error));
+    throw error;
+  }
 }
