@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  Plus, Calendar, List, ChevronLeft, ChevronRight, MapPin, Clock,
-  Image as ImageIcon, Trash2, Pencil, X, Save, FileText, Loader2,
-  Upload, ExternalLink
+  Plus, Calendar, List, ChevronLeft, ChevronRight, MapPin,
+  Image as ImageIcon, Trash2, Pencil, Save, Loader2,
+  Upload, Download
 } from 'lucide-react';
 import { AppCard } from '@/components/ui/AppCard';
 import { AppButton } from '@/components/ui/AppButton';
@@ -105,16 +105,19 @@ export function EventDashboard() {
     if (!form.titulo.trim() || !form.data_evento || !clubId) return;
     setSaving(true);
     try {
+      let saved;
       if (editingEvento) {
-        await atualizarEvento(editingEvento.id, {
+        saved = await atualizarEvento(editingEvento.id, {
           ...form,
           descricao: form.descricao || undefined,
           data_fim: form.data_fim || undefined,
           local: form.local || undefined,
         });
         addToast({ type: 'success', title: 'Atualizado', message: 'Evento atualizado' });
+        setDetailEvento(saved);
+        setDetailFotos(saved.fotos || []);
       } else {
-        await criarEvento({
+        saved = await criarEvento({
           clube_id: clubId,
           titulo: form.titulo,
           data_evento: form.data_evento,
@@ -126,7 +129,8 @@ export function EventDashboard() {
       }
       setFormModalOpen(false);
       carregarEventos();
-    } catch {
+    } catch (err) {
+      console.error('Erro ao salvar evento:', err);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar evento' });
     } finally {
       setSaving(false);
@@ -141,7 +145,8 @@ export function EventDashboard() {
       setDetailModalOpen(false);
       setDetailEvento(null);
       carregarEventos();
-    } catch {
+    } catch (err) {
+      console.error('Erro ao excluir evento:', err);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao excluir' });
     }
   };
@@ -155,7 +160,8 @@ export function EventDashboard() {
         setRelatorioText(full.relatorio || '');
       }
       setDetailModalOpen(true);
-    } catch {
+    } catch (err) {
+      console.error('Erro ao carregar detalhes:', err);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao carregar detalhes' });
     }
   };
@@ -165,13 +171,15 @@ export function EventDashboard() {
     if (!file || !detailEvento) return;
     setUploading(true);
     try {
-      const url = await uploadFotoEvento(detailEvento.id, file);
-      setDetailFotos(prev => [...prev, { id: url, evento_id: detailEvento.id, url, created_at: new Date().toISOString() }]);
+      const record = await uploadFotoEvento(detailEvento.id, file);
+      setDetailFotos(prev => [...prev, record]);
       addToast({ type: 'success', title: 'Foto adicionada', message: 'Upload concluído' });
-    } catch {
+    } catch (err) {
+      console.error('Erro no upload:', err);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao fazer upload' });
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -180,7 +188,8 @@ export function EventDashboard() {
       await deletarFoto(foto.id, foto.url);
       setDetailFotos(prev => prev.filter(f => f.id !== foto.id));
       addToast({ type: 'success', title: 'Removida', message: 'Foto removida' });
-    } catch {
+    } catch (err) {
+      console.error('Erro ao remover foto:', err);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao remover foto' });
     }
   };
@@ -189,10 +198,12 @@ export function EventDashboard() {
     if (!detailEvento) return;
     setSavingRelatorio(true);
     try {
-      await atualizarEvento(detailEvento.id, { relatorio: relatorioText });
+      const updated = await atualizarEvento(detailEvento.id, { relatorio: relatorioText });
+      setDetailEvento(updated);
       addToast({ type: 'success', title: 'Salvo', message: 'Relatório salvo' });
       carregarEventos();
-    } catch {
+    } catch (err) {
+      console.error('Erro ao salvar relatório:', err);
       addToast({ type: 'error', title: 'Erro', message: 'Falha ao salvar relatório' });
     } finally {
       setSavingRelatorio(false);
@@ -481,12 +492,25 @@ export function EventDashboard() {
                         alt=""
                         className="w-full h-full object-cover"
                       />
-                      <button
-                        onClick={() => handleRemoveFoto(foto)}
-                        className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                        <a
+                          href={foto.url}
+                          download
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-full bg-white/90 text-black hover:bg-white transition-colors"
+                          title="Download"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                        <button
+                          onClick={() => handleRemoveFoto(foto)}
+                          className="p-1.5 rounded-full bg-white/90 text-red-600 hover:bg-white transition-colors"
+                          title="Excluir foto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

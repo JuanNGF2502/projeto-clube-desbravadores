@@ -135,7 +135,7 @@ export async function deletarEvento(id: string): Promise<void> {
   }
 }
 
-export async function uploadFotoEvento(eventoId: string, file: File): Promise<string> {
+export async function uploadFotoEvento(eventoId: string, file: File): Promise<EventoFoto> {
   const ext = file.name.split('.').pop() || 'jpg';
   const filePath = `eventos/${eventoId}/${Date.now()}.${ext}`;
 
@@ -154,16 +154,18 @@ export async function uploadFotoEvento(eventoId: string, file: File): Promise<st
 
   const url = urlData.publicUrl;
 
-  const { error: dbError } = await supabase
+  const { data, error: dbError } = await supabase
     .from('eventos_fotos')
-    .insert({ evento_id: eventoId, url });
+    .insert({ evento_id: eventoId, url })
+    .select()
+    .single();
 
   if (dbError) {
     console.error('uploadFotoEvento db error:', JSON.stringify(dbError));
     throw dbError;
   }
 
-  return url;
+  return data;
 }
 
 export async function deletarFoto(fotoId: string, url: string): Promise<void> {
