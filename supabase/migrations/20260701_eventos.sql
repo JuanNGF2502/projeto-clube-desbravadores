@@ -47,6 +47,12 @@ CREATE POLICY "eventos_fotos_insert" ON eventos_fotos FOR INSERT WITH CHECK (aut
 DROP POLICY IF EXISTS "eventos_fotos_delete" ON eventos_fotos;
 CREATE POLICY "eventos_fotos_delete" ON eventos_fotos FOR DELETE USING (auth.role() = 'authenticated');
 
+-- Permissoes de role (necessario para o REST API do Supabase)
+GRANT SELECT ON eventos TO anon, authenticated;
+GRANT INSERT, UPDATE, DELETE ON eventos TO authenticated;
+GRANT SELECT ON eventos_fotos TO anon, authenticated;
+GRANT INSERT, DELETE ON eventos_fotos TO authenticated;
+
 -- Storage bucket para fotos
 INSERT INTO storage.buckets (id, name, public)
 SELECT 'eventos', 'eventos', true
@@ -65,3 +71,7 @@ DROP POLICY IF EXISTS "eventos_delete_obj" ON storage.objects;
 CREATE POLICY "eventos_delete_obj" ON storage.objects FOR DELETE USING (
   bucket_id = 'eventos' AND auth.role() = 'authenticated'
 );
+
+-- Permissoes de role para storage
+GRANT INSERT, SELECT, DELETE ON storage.objects TO authenticated;
+GRANT SELECT ON storage.objects TO anon;
