@@ -11,6 +11,7 @@ import { AppModal } from '@/components/ui/AppModal';
 import { getEstatisticasClube, getRankingUnidades, getMembrosPorClasse, getAtividadeRecente } from '@/lib/queries';
 import { getEspecialidadesPorMembros } from '@/lib/queries/especialidades';
 import type { MembroEspecialidadesResumo } from '@/lib/queries/especialidades';
+import { EventDashboard } from '@/components/eventos/EventDashboard';
 import { getMembrosComProgresso } from '@/lib/queries/classes';
 import { usePontuacao } from '@/contexts/PontuacaoContext';
 import { formatDateBR } from '@/utils/date';
@@ -319,6 +320,10 @@ export default function DashboardPage() {
             </motion.div>
           )}
         </div>
+
+        <motion.div variants={itemVariants}>
+          <EventDashboard />
+        </motion.div>
 
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-3">
