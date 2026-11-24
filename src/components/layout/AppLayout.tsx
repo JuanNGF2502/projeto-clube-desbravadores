@@ -2,11 +2,11 @@
 
 import { ReactNode } from 'react';
 import { LucideIcon } from 'lucide-react';
-import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
 import { motion } from 'framer-motion';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
+import { SwipeTabs } from '@/components/navigation/SwipeTabs';
 import { ClubeSelector } from '@/components/ui/ClubeSelector';
 import { Home, Users, BookOpen, User } from 'lucide-react';
 
@@ -35,19 +35,12 @@ export function AppLayout({
   backHref,
   className,
 }: AppLayoutProps) {
-  const pathname = usePathname();
-
   const navItems: NavItem[] = [
     { label: 'Início', icon: Home, href: '/dashboard' },
     { label: 'Classes', icon: BookOpen, href: '/classes' },
     { label: 'Unidades', icon: Users, href: '/unidades' },
     { label: 'Perfil', icon: User, href: '/profile' },
   ];
-
-  const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/';
-    return pathname.startsWith(href);
-  };
 
   return (
     <div className="min-h-screen w-full max-w-md mx-auto relative flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
@@ -97,16 +90,18 @@ export function AppLayout({
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 16px))' }}>
-        <Breadcrumbs />
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className={cn('p-4', className)}
-        >
-          {children}
-        </motion.div>
+      <main className="flex-1 overflow-y-auto overflow-x-hidden" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 16px))' }}>
+        <SwipeTabs>
+          <Breadcrumbs />
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className={cn('p-4', className)}
+          >
+            {children}
+          </motion.div>
+        </SwipeTabs>
       </main>
 
       {showNavigation && <BottomNavigation items={navItems} />}

@@ -4,6 +4,8 @@ import { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/utils/cn';
+import { getTabIndex, type TabDirection } from '@/utils/tabs';
+import { useNavigationStore } from '@/stores/navigationStore';
 
 interface NavItem {
   label: string;
@@ -19,10 +21,24 @@ export function BottomNavigation({
   items,
 }: BottomNavigationProps) {
   const pathname = usePathname();
+  const activeTabIndex = getTabIndex(pathname);
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/';
     return pathname.startsWith(href);
+  };
+
+  // Mantém a mesma animação direcional do swipe ao trocar de aba pela barra.
+  const handleNavigate = (href: string) => {
+    const targetIndex = getTabIndex(href);
+    if (activeTabIndex < 0 || targetIndex < 0 || targetIndex === activeTabIndex) {
+      return;
+    }
+
+    const direction: TabDirection =
+      targetIndex > activeTabIndex ? 'next' : 'prev';
+
+    useNavigationStore.getState().setTabTransition(direction);
   };
 
   return (
@@ -36,6 +52,7 @@ export function BottomNavigation({
         <Link
           key={item.href}
           href={item.href}
+          onClick={() => handleNavigate(item.href)}
           className={cn(
             'flex flex-col items-center gap-1 transition-colors flex-1 py-1',
             isActive(item.href)
